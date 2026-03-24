@@ -3,7 +3,7 @@ import cors from "cors";
 import express from "express";
 import morgan from "morgan";
 import { env } from "./config/env.js";
-import { attachDemoUser } from "./middleware/auth.js";
+import { attachCurrentUser } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFound } from "./middleware/not-found.js";
 import routes from "./routes/index.js";
@@ -19,7 +19,7 @@ app.use(
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
-app.use(attachDemoUser);
+app.use(attachCurrentUser);
 
 app.get("/", (_req, res) => {
   res.json({

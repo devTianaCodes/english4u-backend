@@ -1,18 +1,35 @@
-export function register(_req, res) {
-  res.status(201).json({
-    message: "Registration scaffold ready",
-    nextPhase: "Persist users and hash passwords in MySQL"
-  });
+import { clearAuthCookie, loginUser, registerUser, setAuthCookie } from "./auth.service.js";
+
+export async function register(req, res, next) {
+  try {
+    const user = await registerUser(req.body ?? {});
+
+    setAuthCookie(res, user);
+
+    return res.status(201).json({
+      user
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
 
-export function login(_req, res) {
-  res.json({
-    message: "Login scaffold ready",
-    nextPhase: "Issue JWT or session cookie after credential validation"
-  });
+export async function login(req, res, next) {
+  try {
+    const user = await loginUser(req.body ?? {});
+
+    setAuthCookie(res, user);
+
+    return res.json({
+      user
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 export function logout(_req, res) {
+  clearAuthCookie(res);
   res.status(204).send();
 }
 

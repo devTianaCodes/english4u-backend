@@ -1,13 +1,41 @@
-export function attachDemoUser(req, _res, next) {
-  const role = req.header("x-demo-role");
+import { env } from "../config/env.js";
+import { findUserById } from "../modules/auth/auth.repository.js";
+import { verifyAuthToken } from "../modules/auth/auth.service.js";
 
-  if (role === "admin") {
-    req.user = { id: 1, email: "admin@english4u.local", role: "admin" };
-  } else if (role === "student") {
-    req.user = { id: 2, email: "student@english4u.local", role: "student" };
+export async function attachCurrentUser(req, _res, next) {
+  try {
+    const authorizationHeader = req.header("authorization");
+    const bearerToken = authorizationHeader?.startsWith("Bearer ")
+      ? authorizationHeader.slice("Bearer ".length).trim()
+      : null;
+    const token = req.cookies?.[env.authCookieName] ?? bearerToken;
+
+    if (!token) {
+      return next();
+    }
+
+    const payload = verifyAuthToken(token);
+
+    if (!payload?.sub) {
+      return next();
+    }
+
+    const user = await findUserById(Number(payload.sub));
+
+    if (user) {
+      req.user = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      };
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
   }
-
-  next();
 }
 
 export function requireAuth(req, res, next) {
