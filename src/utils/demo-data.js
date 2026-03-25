@@ -1,17 +1,147 @@
-export const courseCatalog = [
+const courseLibrary = [
   {
     id: "a1-foundations",
     title: "A1 Foundations",
     level: "A1",
-    published: true
+    published: true,
+    summary: "Start with personal details, daily objects, and short high-frequency sentence patterns.",
+    intensity: "Gentle start",
+    estimatedWeeks: 4,
+    units: [
+      {
+        id: "a1-foundations-unit-1",
+        title: "Introductions and basics",
+        summary: "Introduce yourself, exchange simple details, and understand core classroom language.",
+        lessonCount: 3,
+        checkpointLabel: "Mini speaking review",
+        lessons: [
+          {
+            id: "a1-foundations-unit-1-lesson-1",
+            title: "Saying your name and country",
+            duration: "12 min",
+            focus: "Speaking basics"
+          },
+          {
+            id: "a1-foundations-unit-1-lesson-2",
+            title: "Talking about age and work",
+            duration: "14 min",
+            focus: "Present simple"
+          },
+          {
+            id: "a1-foundations-unit-1-lesson-3",
+            title: "Introducing a classmate",
+            duration: "10 min",
+            focus: "Listening and recall"
+          }
+        ]
+      },
+      {
+        id: "a1-foundations-unit-2",
+        title: "Daily routines",
+        summary: "Describe your day with simple verbs, times, and common routine phrases.",
+        lessonCount: 3,
+        checkpointLabel: "Routine vocabulary quiz",
+        lessons: [
+          {
+            id: "a1-foundations-unit-2-lesson-1",
+            title: "Morning routine essentials",
+            duration: "11 min",
+            focus: "Vocabulary"
+          },
+          {
+            id: "a1-foundations-unit-2-lesson-2",
+            title: "Using every day and usually",
+            duration: "13 min",
+            focus: "Grammar patterns"
+          },
+          {
+            id: "a1-foundations-unit-2-lesson-3",
+            title: "Describe your weekday",
+            duration: "15 min",
+            focus: "Sentence building"
+          }
+        ]
+      }
+    ]
   },
   {
     id: "a2-confidence",
     title: "A2 Confidence",
     level: "A2",
-    published: true
+    published: true,
+    summary: "Build practical fluency for routines, work, travel, and everyday social conversations.",
+    intensity: "Most popular path",
+    estimatedWeeks: 6,
+    units: [
+      {
+        id: "a2-confidence-unit-1",
+        title: "Everyday habits",
+        summary: "Talk about frequent actions, weekly plans, and activities with more confidence.",
+        lessonCount: 3,
+        checkpointLabel: "Habit accuracy quiz",
+        lessons: [
+          {
+            id: "a2-confidence-unit-1-lesson-1",
+            title: "Describing your weekly routine",
+            duration: "14 min",
+            focus: "Routine fluency"
+          },
+          {
+            id: "a2-confidence-unit-1-lesson-2",
+            title: "Time expressions for habits",
+            duration: "12 min",
+            focus: "Vocabulary"
+          },
+          {
+            id: "a2-confidence-unit-1-lesson-3",
+            title: "Work and study schedules",
+            duration: "16 min",
+            focus: "Reading and comprehension"
+          }
+        ]
+      },
+      {
+        id: "a2-confidence-unit-2",
+        title: "Talking about routines",
+        summary: "Use present simple patterns, sequencing, and time phrases to sound more natural.",
+        lessonCount: 3,
+        checkpointLabel: "Daily routines checkpoint",
+        lessons: [
+          {
+            id: "a2-confidence-unit-2-lesson-1",
+            title: "Talking about daily routines",
+            duration: "15 min",
+            focus: "Grammar and reading"
+          },
+          {
+            id: "a2-confidence-unit-2-lesson-2",
+            title: "After work and evening plans",
+            duration: "13 min",
+            focus: "Conversation prompts"
+          },
+          {
+            id: "a2-confidence-unit-2-lesson-3",
+            title: "Weekend routine comparison",
+            duration: "16 min",
+            focus: "Speaking confidence"
+          }
+        ]
+      }
+    ]
   }
 ];
+
+export const courseCatalog = courseLibrary.map((course) => ({
+  id: course.id,
+  title: course.title,
+  level: course.level,
+  published: course.published,
+  summary: course.summary,
+  intensity: course.intensity,
+  estimatedWeeks: course.estimatedWeeks,
+  unitCount: course.units.length,
+  lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0)
+}));
 
 export const dashboardSnapshot = {
   learner: {
@@ -25,6 +155,40 @@ export const dashboardSnapshot = {
   completedLessons: 14,
   quizAverage: 86
 };
+
+export function buildCourseDetail(courseId) {
+  const course = courseLibrary.find((item) => item.id === courseId);
+
+  if (!course) {
+    return null;
+  }
+
+  return {
+    ...course,
+    unitCount: course.units.length,
+    lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0),
+    units: course.units.map((unit, index) => ({
+      ...unit,
+      positionLabel: `Unit ${String(index + 1).padStart(2, "0")}`
+    }))
+  };
+}
+
+export function buildUnitDetail(unitId) {
+  for (const course of courseLibrary) {
+    const unit = course.units.find((candidate) => candidate.id === unitId);
+
+    if (unit) {
+      return {
+        ...unit,
+        courseId: course.id,
+        courseTitle: course.title
+      };
+    }
+  }
+
+  return null;
+}
 
 export function buildLesson(lessonId) {
   return {

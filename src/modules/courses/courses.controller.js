@@ -1,4 +1,4 @@
-import { courseCatalog } from "../../utils/demo-data.js";
+import { buildCourseDetail, buildUnitDetail, courseCatalog } from "../../utils/demo-data.js";
 
 export function listCourses(_req, res) {
   res.json({
@@ -7,19 +7,13 @@ export function listCourses(_req, res) {
 }
 
 export function getCourse(req, res) {
-  const course = courseCatalog.find((item) => item.id === req.params.courseId);
+  const course = buildCourseDetail(req.params.courseId);
 
   if (!course) {
     return res.status(404).json({ error: "Course not found" });
   }
 
-  return res.json({
-    ...course,
-    units: [
-      { id: `${course.id}-unit-1`, title: "Introductions and basics" },
-      { id: `${course.id}-unit-2`, title: "Daily routines" }
-    ]
-  });
+  return res.json(course);
 }
 
 export function listLevels(_req, res) {
@@ -29,11 +23,11 @@ export function listLevels(_req, res) {
 }
 
 export function getUnit(req, res) {
-  res.json({
-    id: req.params.unitId,
-    lessons: [
-      { id: `${req.params.unitId}-lesson-1`, title: "Warm-up and vocabulary" },
-      { id: `${req.params.unitId}-lesson-2`, title: "Grammar focus" }
-    ]
-  });
+  const unit = buildUnitDetail(req.params.unitId);
+
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found" });
+  }
+
+  return res.json(unit);
 }
