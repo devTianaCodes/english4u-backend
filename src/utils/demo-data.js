@@ -192,6 +192,28 @@ function findLessonRecordById(lessonId) {
   return null;
 }
 
+function getCourseByLevel(levelCode) {
+  return courseLibrary.find((course) => course.level === levelCode) ?? courseLibrary[0];
+}
+
+function getFlattenedLessonsForCourse(courseId) {
+  const course = findCourseById(courseId);
+
+  if (!course) {
+    return [];
+  }
+
+  return course.units.flatMap((unit, unitIndex) =>
+    unit.lessons.map((lesson, lessonIndex) => ({
+      ...lesson,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      unitIndex,
+      lessonIndex
+    }))
+  );
+}
+
 export function getCourseCatalog() {
   return courseLibrary.map(mapCourseForCatalog);
 }
@@ -381,7 +403,11 @@ export function buildCourseDetail(courseId) {
     lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0),
     units: course.units.map((unit, index) => ({
       ...unit,
-      positionLabel: `Unit ${String(index + 1).padStart(2, "0")}`
+      positionLabel: `Unit ${String(index + 1).padStart(2, "0")}`,
+      lessons: unit.lessons.map((lesson, lessonIndex) => ({
+        ...lesson,
+        positionLabel: `Lesson ${String(lessonIndex + 1).padStart(2, "0")}`
+      }))
     }))
   };
 }
@@ -528,4 +554,35 @@ export function resolvePersistedQuizId(quizSlug) {
   }
 
   return null;
+}
+
+export function resolveLessonSlugFromPersistedId(lessonId) {
+  if (lessonId === 1) {
+    return "a2-confidence-unit-2-lesson-1";
+  }
+
+  return null;
+}
+
+export function buildLearnerPath(levelCode, completedLessonSlugs = []) {
+  const course = getCourseByLevel(levelCode);
+  const orderedLessons = getFlattenedLessonsForCourse(course.id);
+  const completedSet = new Set(completedLessonSlugs);
+  const nextLesson = orderedLessons.find((lesson) => !completedSet.has(lesson.id)) ?? orderedLessons[0] ?? null;
+
+  return {
+    courseId: course.id,
+    courseTitle: course.title,
+    level: course.level,
+    nextLesson: nextLesson
+      ? {
+          id: nextLesson.id,
+          title: nextLesson.title,
+          unitTitle: nextLesson.unitTitle,
+          duration: nextLesson.duration,
+          quizId: `${nextLesson.id}-quiz`
+        }
+      : null,
+    completedLessonSlugs
+  };
 }

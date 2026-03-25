@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool.js";
+import { resolveLessonSlugFromPersistedId } from "../../utils/demo-data.js";
 
 function toIsoDate(value) {
   return new Date(value).toISOString().slice(0, 10);
@@ -104,6 +105,22 @@ export async function getProgressSnapshot(userId) {
     longestStreak: streakRow?.longest_streak ?? 0,
     lastActivityAt: streakRow?.last_activity_at ?? null
   };
+}
+
+export async function getCompletedLessonSlugs(userId) {
+  const [rows] = await pool.execute(
+    `
+      SELECT lesson_id
+      FROM lesson_progress
+      WHERE user_id = ? AND status = 'completed'
+      ORDER BY completed_at ASC, id ASC
+    `,
+    [userId]
+  );
+
+  return rows
+    .map((row) => resolveLessonSlugFromPersistedId(row.lesson_id))
+    .filter(Boolean);
 }
 
 export async function markLessonCompleted(userId, lessonId) {
