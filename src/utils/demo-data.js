@@ -174,6 +174,24 @@ function findCourseById(courseId) {
   return courseLibrary.find((course) => course.id === courseId);
 }
 
+function findLessonRecordById(lessonId) {
+  for (const course of courseLibrary) {
+    for (const unit of course.units) {
+      const lesson = unit.lessons.find((candidate) => candidate.id === lessonId);
+
+      if (lesson) {
+        return {
+          course,
+          unit,
+          lesson
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export function getCourseCatalog() {
   return courseLibrary.map(mapCourseForCatalog);
 }
@@ -385,10 +403,14 @@ export function buildUnitDetail(unitId) {
 }
 
 export function buildLesson(lessonId) {
+  const lessonRecord = findLessonRecordById(lessonId);
+
   return {
     id: lessonId,
-    title: "Talking about daily routines",
-    summary: "Learn how to describe habits, routines, and time-based actions using clear everyday English.",
+    title: lessonRecord?.lesson.title ?? "Talking about daily routines",
+    summary:
+      lessonRecord?.lesson.summary ??
+      "Learn how to describe habits, routines, and time-based actions using clear everyday English.",
     quizId: `${lessonId}-quiz`,
     blocks: [
       {
@@ -426,10 +448,13 @@ export function buildLesson(lessonId) {
 }
 
 export function buildQuiz(quizId) {
+  const lessonRecord = quizId.endsWith("-quiz") ? findLessonRecordById(quizId.slice(0, -5)) : null;
+
   return {
     id: quizId,
-    title: "Daily routines checkpoint",
-    description: "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
+    title: lessonRecord ? `${lessonRecord.lesson.title} checkpoint` : "Daily routines checkpoint",
+    description:
+      "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
     questions: [
       {
         id: `${quizId}-q1`,
@@ -487,4 +512,20 @@ export function scoreQuizSubmission(quizId, answers) {
     totalQuestions,
     score: Math.round((correctAnswers / totalQuestions) * 100)
   };
+}
+
+export function resolvePersistedLessonId(lessonSlug) {
+  if (lessonSlug === "a2-confidence-unit-2-lesson-1") {
+    return 1;
+  }
+
+  return null;
+}
+
+export function resolvePersistedQuizId(quizSlug) {
+  if (quizSlug === "a2-confidence-unit-2-lesson-1-quiz") {
+    return 1;
+  }
+
+  return null;
 }

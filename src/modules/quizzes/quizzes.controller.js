@@ -1,4 +1,5 @@
-import { buildQuiz, scoreQuizSubmission } from "../../utils/demo-data.js";
+import { buildQuiz, resolvePersistedQuizId, scoreQuizSubmission } from "../../utils/demo-data.js";
+import { getProgressSnapshot, saveQuizAttempt } from "../progress/progress.repository.js";
 
 export function getQuiz(req, res) {
   const quiz = buildQuiz(req.params.quizId);
@@ -17,13 +18,28 @@ export function getQuiz(req, res) {
   });
 }
 
-export function submitQuiz(req, res) {
+export async function submitQuiz(req, res, next) {
   const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
   const result = scoreQuizSubmission(req.params.quizId, answers);
 
-  res.json({
-    quizId: req.params.quizId,
-    ...result,
-    submittedAt: new Date().toISOString()
-  });
+  try {
+    const persistedQuizId = resolvePersistedQuizId(req.params.quizId);
+    let streak = null;
+    let snapshot = null;
+
+    if (persistedQuizId) {
+      streak = await saveQuizAttempt(req.user.id, persistedQuizId, result.score, answers);
+      snapshot = await getProgressSnapshot(req.user.id);
+    }
+
+    return res.json({
+      quizId: req.params.quizId,
+      ...result,
+      streak: streak?.currentStreak ?? null,
+      quizAverage: snapshot?.quizAverage ?? result.score,
+      submittedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
