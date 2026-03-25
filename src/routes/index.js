@@ -15,7 +15,7 @@ const router = Router();
 
 router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
-router.use("/onboarding", onboardingRoutes);
+router.use("/onboarding", requireAuth, onboardingRoutes);
 router.use("/courses", coursesRoutes);
 router.use("/lessons", lessonsRoutes);
 router.use("/quizzes", requireAuth, quizzesRoutes);
