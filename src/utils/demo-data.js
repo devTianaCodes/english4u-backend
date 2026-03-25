@@ -131,17 +131,52 @@ const courseLibrary = [
   }
 ];
 
-export const courseCatalog = courseLibrary.map((course) => ({
-  id: course.id,
-  title: course.title,
-  level: course.level,
-  published: course.published,
-  summary: course.summary,
-  intensity: course.intensity,
-  estimatedWeeks: course.estimatedWeeks,
-  unitCount: course.units.length,
-  lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0)
-}));
+const adminUsers = [
+  {
+    id: "admin-1",
+    name: "Admin English4U",
+    role: "admin",
+    currentCourse: "Platform operations",
+    streak: 0
+  },
+  {
+    id: "student-1",
+    name: "Alex Morgan",
+    role: "student",
+    currentCourse: "A2 Confidence",
+    streak: 12
+  }
+];
+
+function mapCourseForCatalog(course) {
+  return {
+    id: course.id,
+    title: course.title,
+    level: course.level,
+    published: course.published,
+    summary: course.summary,
+    intensity: course.intensity,
+    estimatedWeeks: course.estimatedWeeks,
+    unitCount: course.units.length,
+    lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0)
+  };
+}
+
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function findCourseById(courseId) {
+  return courseLibrary.find((course) => course.id === courseId);
+}
+
+export function getCourseCatalog() {
+  return courseLibrary.map(mapCourseForCatalog);
+}
 
 export const dashboardSnapshot = {
   learner: {
@@ -155,6 +190,165 @@ export const dashboardSnapshot = {
   completedLessons: 14,
   quizAverage: 86
 };
+
+export function getAdminCollectionItems(collection) {
+  if (collection === "courses") {
+    return getCourseCatalog();
+  }
+
+  if (collection === "levels") {
+    return courseLibrary.map((course) => ({
+      id: `${course.id}-${course.level}`,
+      code: course.level,
+      title: course.title,
+      courseTitle: course.title,
+      unitCount: course.units.length
+    }));
+  }
+
+  if (collection === "units") {
+    return courseLibrary.flatMap((course) =>
+      course.units.map((unit) => ({
+        id: unit.id,
+        title: unit.title,
+        courseTitle: course.title,
+        lessonCount: unit.lessons.length,
+        checkpointLabel: unit.checkpointLabel
+      }))
+    );
+  }
+
+  if (collection === "lessons") {
+    return courseLibrary.flatMap((course) =>
+      course.units.flatMap((unit) =>
+        unit.lessons.map((lesson) => ({
+          id: lesson.id,
+          title: lesson.title,
+          courseTitle: course.title,
+          unitTitle: unit.title,
+          duration: lesson.duration,
+          focus: lesson.focus
+        }))
+      )
+    );
+  }
+
+  if (collection === "quizzes") {
+    return courseLibrary.flatMap((course) =>
+      course.units.flatMap((unit) =>
+        unit.lessons.map((lesson) => ({
+          id: `${lesson.id}-quiz`,
+          title: `${lesson.title} quiz`,
+          courseTitle: course.title,
+          unitTitle: unit.title
+        }))
+      )
+    );
+  }
+
+  if (collection === "users") {
+    return adminUsers;
+  }
+
+  return [];
+}
+
+export function createAdminCollectionEntry(collection, payload) {
+  if (collection !== "courses") {
+    throw new Error("Creation is currently enabled for courses only");
+  }
+
+  const title = payload.title?.trim();
+  const level = payload.level?.trim() || "A1";
+  const summary = payload.summary?.trim() || "New course summary pending.";
+
+  if (!title) {
+    throw new Error("Course title is required");
+  }
+
+  const id = slugify(payload.slug?.trim() || title);
+
+  if (!id) {
+    throw new Error("Course slug is invalid");
+  }
+
+  if (findCourseById(id)) {
+    throw new Error("A course with this slug already exists");
+  }
+
+  const newCourse = {
+    id,
+    title,
+    level,
+    published: Boolean(payload.published),
+    summary,
+    intensity: payload.intensity?.trim() || "New course",
+    estimatedWeeks: Number(payload.estimatedWeeks) || 4,
+    units: []
+  };
+
+  courseLibrary.unshift(newCourse);
+
+  return mapCourseForCatalog(newCourse);
+}
+
+export function updateAdminCollectionEntry(collection, id, payload) {
+  if (collection !== "courses") {
+    throw new Error("Editing is currently enabled for courses only");
+  }
+
+  const course = findCourseById(id);
+
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  if (payload.title !== undefined) {
+    const nextTitle = payload.title.trim();
+
+    if (!nextTitle) {
+      throw new Error("Course title is required");
+    }
+
+    course.title = nextTitle;
+  }
+
+  if (payload.level !== undefined) {
+    course.level = payload.level.trim() || course.level;
+  }
+
+  if (payload.summary !== undefined) {
+    course.summary = payload.summary.trim() || course.summary;
+  }
+
+  if (payload.intensity !== undefined) {
+    course.intensity = payload.intensity.trim() || course.intensity;
+  }
+
+  if (payload.estimatedWeeks !== undefined) {
+    course.estimatedWeeks = Number(payload.estimatedWeeks) || course.estimatedWeeks;
+  }
+
+  if (payload.published !== undefined) {
+    course.published = Boolean(payload.published);
+  }
+
+  return mapCourseForCatalog(course);
+}
+
+export function deleteAdminCollectionEntry(collection, id) {
+  if (collection !== "courses") {
+    throw new Error("Deletion is currently enabled for courses only");
+  }
+
+  const index = courseLibrary.findIndex((course) => course.id === id);
+
+  if (index === -1) {
+    throw new Error("Course not found");
+  }
+
+  courseLibrary.splice(index, 1);
+}
 
 export function buildCourseDetail(courseId) {
   const course = courseLibrary.find((item) => item.id === courseId);

@@ -1,28 +1,49 @@
+import { HttpError } from "../../utils/http-error.js";
+import {
+  createAdminCollectionEntry,
+  deleteAdminCollectionEntry,
+  getAdminCollectionItems,
+  updateAdminCollectionEntry
+} from "../../utils/demo-data.js";
+
 export function listAdminCollection(req, res) {
   res.json({
     collection: req.params.collection,
-    items: [],
-    message: "Admin CRUD scaffold ready"
+    items: getAdminCollectionItems(req.params.collection)
   });
 }
 
-export function createAdminCollectionItem(req, res) {
-  res.status(201).json({
-    collection: req.params.collection,
-    payload: req.body ?? {},
-    message: "Create scaffold ready"
-  });
+export function createAdminCollectionItem(req, res, next) {
+  try {
+    const item = createAdminCollectionEntry(req.params.collection, req.body ?? {});
+
+    return res.status(201).json({
+      collection: req.params.collection,
+      item
+    });
+  } catch (error) {
+    return next(new HttpError(400, error.message));
+  }
 }
 
-export function updateAdminCollectionItem(req, res) {
-  res.json({
-    collection: req.params.collection,
-    id: req.params.id,
-    payload: req.body ?? {},
-    message: "Update scaffold ready"
-  });
+export function updateAdminCollectionItem(req, res, next) {
+  try {
+    const item = updateAdminCollectionEntry(req.params.collection, req.params.id, req.body ?? {});
+
+    return res.json({
+      collection: req.params.collection,
+      item
+    });
+  } catch (error) {
+    return next(new HttpError(400, error.message));
+  }
 }
 
-export function deleteAdminCollectionItem(req, res) {
-  res.status(204).send();
+export function deleteAdminCollectionItem(req, res, next) {
+  try {
+    deleteAdminCollectionEntry(req.params.collection, req.params.id);
+    return res.status(204).send();
+  } catch (error) {
+    return next(new HttpError(400, error.message));
+  }
 }

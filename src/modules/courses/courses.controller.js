@@ -1,8 +1,8 @@
-import { buildCourseDetail, buildUnitDetail, courseCatalog } from "../../utils/demo-data.js";
+import { buildCourseDetail, buildUnitDetail, getCourseCatalog } from "../../utils/demo-data.js";
 
 export function listCourses(_req, res) {
   res.json({
-    items: courseCatalog
+    items: getCourseCatalog()
   });
 }
 
