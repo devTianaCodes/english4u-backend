@@ -174,6 +174,21 @@ function findCourseById(courseId) {
   return courseLibrary.find((course) => course.id === courseId);
 }
 
+function findUnitRecordById(unitId) {
+  for (const course of courseLibrary) {
+    const unit = course.units.find((candidate) => candidate.id === unitId);
+
+    if (unit) {
+      return {
+        course,
+        unit
+      };
+    }
+  }
+
+  return null;
+}
+
 function findLessonRecordById(lessonId) {
   for (const course of courseLibrary) {
     for (const unit of course.units) {
@@ -251,7 +266,9 @@ export function getAdminCollectionItems(collection) {
       course.units.map((unit) => ({
         id: unit.id,
         title: unit.title,
+        courseId: course.id,
         courseTitle: course.title,
+        summary: unit.summary,
         lessonCount: unit.lessons.length,
         checkpointLabel: unit.checkpointLabel
       }))
@@ -294,100 +311,199 @@ export function getAdminCollectionItems(collection) {
 }
 
 export function createAdminCollectionEntry(collection, payload) {
-  if (collection !== "courses") {
-    throw new Error("Creation is currently enabled for courses only");
-  }
+  if (collection === "courses") {
+    const title = payload.title?.trim();
+    const level = payload.level?.trim() || "A1";
+    const summary = payload.summary?.trim() || "New course summary pending.";
 
-  const title = payload.title?.trim();
-  const level = payload.level?.trim() || "A1";
-  const summary = payload.summary?.trim() || "New course summary pending.";
-
-  if (!title) {
-    throw new Error("Course title is required");
-  }
-
-  const id = slugify(payload.slug?.trim() || title);
-
-  if (!id) {
-    throw new Error("Course slug is invalid");
-  }
-
-  if (findCourseById(id)) {
-    throw new Error("A course with this slug already exists");
-  }
-
-  const newCourse = {
-    id,
-    title,
-    level,
-    published: Boolean(payload.published),
-    summary,
-    intensity: payload.intensity?.trim() || "New course",
-    estimatedWeeks: Number(payload.estimatedWeeks) || 4,
-    units: []
-  };
-
-  courseLibrary.unshift(newCourse);
-
-  return mapCourseForCatalog(newCourse);
-}
-
-export function updateAdminCollectionEntry(collection, id, payload) {
-  if (collection !== "courses") {
-    throw new Error("Editing is currently enabled for courses only");
-  }
-
-  const course = findCourseById(id);
-
-  if (!course) {
-    throw new Error("Course not found");
-  }
-
-  if (payload.title !== undefined) {
-    const nextTitle = payload.title.trim();
-
-    if (!nextTitle) {
+    if (!title) {
       throw new Error("Course title is required");
     }
 
-    course.title = nextTitle;
+    const id = slugify(payload.slug?.trim() || title);
+
+    if (!id) {
+      throw new Error("Course slug is invalid");
+    }
+
+    if (findCourseById(id)) {
+      throw new Error("A course with this slug already exists");
+    }
+
+    const newCourse = {
+      id,
+      title,
+      level,
+      published: Boolean(payload.published),
+      summary,
+      intensity: payload.intensity?.trim() || "New course",
+      estimatedWeeks: Number(payload.estimatedWeeks) || 4,
+      units: []
+    };
+
+    courseLibrary.unshift(newCourse);
+
+    return mapCourseForCatalog(newCourse);
   }
 
-  if (payload.level !== undefined) {
-    course.level = payload.level.trim() || course.level;
+  if (collection === "units") {
+    const course = findCourseById(payload.courseId);
+    const title = payload.title?.trim();
+
+    if (!course) {
+      throw new Error("A parent course is required");
+    }
+
+    if (!title) {
+      throw new Error("Unit title is required");
+    }
+
+    const id = slugify(`${course.id}-${title}`);
+
+    if (findUnitRecordById(id)) {
+      throw new Error("A unit with this slug already exists");
+    }
+
+    const newUnit = {
+      id,
+      title,
+      summary: payload.summary?.trim() || "New unit summary pending.",
+      lessonCount: 0,
+      checkpointLabel: payload.checkpointLabel?.trim() || "Checkpoint to be defined",
+      lessons: []
+    };
+
+    course.units.push(newUnit);
+
+    return {
+      id: newUnit.id,
+      title: newUnit.title,
+      courseId: course.id,
+      courseTitle: course.title,
+      summary: newUnit.summary,
+      lessonCount: 0,
+      checkpointLabel: newUnit.checkpointLabel
+    };
   }
 
-  if (payload.summary !== undefined) {
-    course.summary = payload.summary.trim() || course.summary;
+  throw new Error("Creation is currently enabled for courses and units only");
+}
+
+export function updateAdminCollectionEntry(collection, id, payload) {
+  if (collection === "courses") {
+    const course = findCourseById(id);
+
+    if (!course) {
+      throw new Error("Course not found");
+    }
+
+    if (payload.title !== undefined) {
+      const nextTitle = payload.title.trim();
+
+      if (!nextTitle) {
+        throw new Error("Course title is required");
+      }
+
+      course.title = nextTitle;
+    }
+
+    if (payload.level !== undefined) {
+      course.level = payload.level.trim() || course.level;
+    }
+
+    if (payload.summary !== undefined) {
+      course.summary = payload.summary.trim() || course.summary;
+    }
+
+    if (payload.intensity !== undefined) {
+      course.intensity = payload.intensity.trim() || course.intensity;
+    }
+
+    if (payload.estimatedWeeks !== undefined) {
+      course.estimatedWeeks = Number(payload.estimatedWeeks) || course.estimatedWeeks;
+    }
+
+    if (payload.published !== undefined) {
+      course.published = Boolean(payload.published);
+    }
+
+    return mapCourseForCatalog(course);
   }
 
-  if (payload.intensity !== undefined) {
-    course.intensity = payload.intensity.trim() || course.intensity;
+  if (collection === "units") {
+    const unitRecord = findUnitRecordById(id);
+    const nextCourse = findCourseById(payload.courseId);
+
+    if (!unitRecord) {
+      throw new Error("Unit not found");
+    }
+
+    if (!nextCourse) {
+      throw new Error("A parent course is required");
+    }
+
+    if (payload.title !== undefined) {
+      const nextTitle = payload.title.trim();
+
+      if (!nextTitle) {
+        throw new Error("Unit title is required");
+      }
+
+      unitRecord.unit.title = nextTitle;
+    }
+
+    if (payload.summary !== undefined) {
+      unitRecord.unit.summary = payload.summary.trim() || unitRecord.unit.summary;
+    }
+
+    if (payload.checkpointLabel !== undefined) {
+      unitRecord.unit.checkpointLabel = payload.checkpointLabel.trim() || unitRecord.unit.checkpointLabel;
+    }
+
+    if (unitRecord.course.id !== nextCourse.id) {
+      unitRecord.course.units = unitRecord.course.units.filter((candidate) => candidate.id !== id);
+      nextCourse.units.push(unitRecord.unit);
+      unitRecord.course = nextCourse;
+    }
+
+    return {
+      id: unitRecord.unit.id,
+      title: unitRecord.unit.title,
+      courseId: unitRecord.course.id,
+      courseTitle: unitRecord.course.title,
+      summary: unitRecord.unit.summary,
+      lessonCount: unitRecord.unit.lessons.length,
+      checkpointLabel: unitRecord.unit.checkpointLabel
+    };
   }
 
-  if (payload.estimatedWeeks !== undefined) {
-    course.estimatedWeeks = Number(payload.estimatedWeeks) || course.estimatedWeeks;
-  }
-
-  if (payload.published !== undefined) {
-    course.published = Boolean(payload.published);
-  }
-
-  return mapCourseForCatalog(course);
+  throw new Error("Editing is currently enabled for courses and units only");
 }
 
 export function deleteAdminCollectionEntry(collection, id) {
-  if (collection !== "courses") {
-    throw new Error("Deletion is currently enabled for courses only");
+  if (collection === "courses") {
+    const index = courseLibrary.findIndex((course) => course.id === id);
+
+    if (index === -1) {
+      throw new Error("Course not found");
+    }
+
+    courseLibrary.splice(index, 1);
+    return;
   }
 
-  const index = courseLibrary.findIndex((course) => course.id === id);
+  if (collection === "units") {
+    const unitRecord = findUnitRecordById(id);
 
-  if (index === -1) {
-    throw new Error("Course not found");
+    if (!unitRecord) {
+      throw new Error("Unit not found");
+    }
+
+    unitRecord.course.units = unitRecord.course.units.filter((candidate) => candidate.id !== id);
+    return;
   }
 
-  courseLibrary.splice(index, 1);
+  throw new Error("Deletion is currently enabled for courses and units only");
 }
 
 export function buildCourseDetail(courseId) {
