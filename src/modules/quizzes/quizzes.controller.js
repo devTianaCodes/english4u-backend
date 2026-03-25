@@ -21,6 +21,7 @@ export function getQuiz(req, res) {
 export async function submitQuiz(req, res, next) {
   const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
   const result = scoreQuizSubmission(req.params.quizId, answers);
+  const quiz = buildQuiz(req.params.quizId);
 
   try {
     const persistedQuizId = resolvePersistedQuizId(req.params.quizId);
@@ -34,6 +35,10 @@ export async function submitQuiz(req, res, next) {
 
     return res.json({
       quizId: req.params.quizId,
+      lessonId: quiz.lessonId,
+      courseId: quiz.courseId,
+      courseTitle: quiz.courseTitle,
+      nextLesson: quiz.nextLesson,
       ...result,
       streak: streak?.currentStreak ?? null,
       quizAverage: snapshot?.quizAverage ?? result.score,

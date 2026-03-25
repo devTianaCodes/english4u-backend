@@ -207,6 +207,24 @@ function findLessonRecordById(lessonId) {
   return null;
 }
 
+function mapLessonForAdmin(course, unit, lesson) {
+  return {
+    id: lesson.id,
+    title: lesson.title,
+    courseId: course.id,
+    courseTitle: course.title,
+    unitId: unit.id,
+    unitTitle: unit.title,
+    summary: lesson.summary,
+    duration: lesson.duration,
+    focus: lesson.focus
+  };
+}
+
+function syncUnitLessonCount(unit) {
+  unit.lessonCount = unit.lessons.length;
+}
+
 function getCourseByLevel(levelCode) {
   return courseLibrary.find((course) => course.level === levelCode) ?? courseLibrary[0];
 }
@@ -221,12 +239,38 @@ function getFlattenedLessonsForCourse(courseId) {
   return course.units.flatMap((unit, unitIndex) =>
     unit.lessons.map((lesson, lessonIndex) => ({
       ...lesson,
+      courseId: course.id,
+      courseTitle: course.title,
       unitId: unit.id,
       unitTitle: unit.title,
       unitIndex,
       lessonIndex
     }))
   );
+}
+
+function findLessonSequence(lessonId) {
+  const lessonRecord = findLessonRecordById(lessonId);
+
+  if (!lessonRecord) {
+    return null;
+  }
+
+  const orderedLessons = getFlattenedLessonsForCourse(lessonRecord.course.id);
+  const lessonIndex = orderedLessons.findIndex((candidate) => candidate.id === lessonId);
+
+  if (lessonIndex === -1) {
+    return null;
+  }
+
+  return {
+    lessonRecord,
+    orderedLessons,
+    currentLesson: orderedLessons[lessonIndex],
+    previousLesson: orderedLessons[lessonIndex - 1] ?? null,
+    nextLesson: orderedLessons[lessonIndex + 1] ?? null,
+    lessonIndex
+  };
 }
 
 export function getCourseCatalog() {
@@ -278,14 +322,7 @@ export function getAdminCollectionItems(collection) {
   if (collection === "lessons") {
     return courseLibrary.flatMap((course) =>
       course.units.flatMap((unit) =>
-        unit.lessons.map((lesson) => ({
-          id: lesson.id,
-          title: lesson.title,
-          courseTitle: course.title,
-          unitTitle: unit.title,
-          duration: lesson.duration,
-          focus: lesson.focus
-        }))
+        unit.lessons.map((lesson) => mapLessonForAdmin(course, unit, lesson))
       )
     );
   }
@@ -386,7 +423,39 @@ export function createAdminCollectionEntry(collection, payload) {
     };
   }
 
-  throw new Error("Creation is currently enabled for courses and units only");
+  if (collection === "lessons") {
+    const unitRecord = findUnitRecordById(payload.unitId);
+    const title = payload.title?.trim();
+
+    if (!unitRecord) {
+      throw new Error("A parent unit is required");
+    }
+
+    if (!title) {
+      throw new Error("Lesson title is required");
+    }
+
+    const id = slugify(`${unitRecord.unit.id}-${title}`);
+
+    if (findLessonRecordById(id)) {
+      throw new Error("A lesson with this slug already exists");
+    }
+
+    const newLesson = {
+      id,
+      title,
+      summary: payload.summary?.trim() || "New lesson summary pending.",
+      duration: payload.duration?.trim() || "12 min",
+      focus: payload.focus?.trim() || "Core practice"
+    };
+
+    unitRecord.unit.lessons.push(newLesson);
+    syncUnitLessonCount(unitRecord.unit);
+
+    return mapLessonForAdmin(unitRecord.course, unitRecord.unit, newLesson);
+  }
+
+  throw new Error("Creation is currently enabled for courses, units, and lessons only");
 }
 
 export function updateAdminCollectionEntry(collection, id, payload) {
@@ -477,7 +546,53 @@ export function updateAdminCollectionEntry(collection, id, payload) {
     };
   }
 
-  throw new Error("Editing is currently enabled for courses and units only");
+  if (collection === "lessons") {
+    const lessonRecord = findLessonRecordById(id);
+    const nextUnitRecord = findUnitRecordById(payload.unitId);
+
+    if (!lessonRecord) {
+      throw new Error("Lesson not found");
+    }
+
+    if (!nextUnitRecord) {
+      throw new Error("A parent unit is required");
+    }
+
+    if (payload.title !== undefined) {
+      const nextTitle = payload.title.trim();
+
+      if (!nextTitle) {
+        throw new Error("Lesson title is required");
+      }
+
+      lessonRecord.lesson.title = nextTitle;
+    }
+
+    if (payload.summary !== undefined) {
+      lessonRecord.lesson.summary = payload.summary.trim() || lessonRecord.lesson.summary;
+    }
+
+    if (payload.duration !== undefined) {
+      lessonRecord.lesson.duration = payload.duration.trim() || lessonRecord.lesson.duration;
+    }
+
+    if (payload.focus !== undefined) {
+      lessonRecord.lesson.focus = payload.focus.trim() || lessonRecord.lesson.focus;
+    }
+
+    if (lessonRecord.unit.id !== nextUnitRecord.unit.id) {
+      lessonRecord.unit.lessons = lessonRecord.unit.lessons.filter((candidate) => candidate.id !== id);
+      syncUnitLessonCount(lessonRecord.unit);
+      nextUnitRecord.unit.lessons.push(lessonRecord.lesson);
+      syncUnitLessonCount(nextUnitRecord.unit);
+      lessonRecord.course = nextUnitRecord.course;
+      lessonRecord.unit = nextUnitRecord.unit;
+    }
+
+    return mapLessonForAdmin(lessonRecord.course, lessonRecord.unit, lessonRecord.lesson);
+  }
+
+  throw new Error("Editing is currently enabled for courses, units, and lessons only");
 }
 
 export function deleteAdminCollectionEntry(collection, id) {
@@ -503,7 +618,19 @@ export function deleteAdminCollectionEntry(collection, id) {
     return;
   }
 
-  throw new Error("Deletion is currently enabled for courses and units only");
+  if (collection === "lessons") {
+    const lessonRecord = findLessonRecordById(id);
+
+    if (!lessonRecord) {
+      throw new Error("Lesson not found");
+    }
+
+    lessonRecord.unit.lessons = lessonRecord.unit.lessons.filter((candidate) => candidate.id !== id);
+    syncUnitLessonCount(lessonRecord.unit);
+    return;
+  }
+
+  throw new Error("Deletion is currently enabled for courses, units, and lessons only");
 }
 
 export function buildCourseDetail(courseId) {
@@ -545,15 +672,38 @@ export function buildUnitDetail(unitId) {
 }
 
 export function buildLesson(lessonId) {
-  const lessonRecord = findLessonRecordById(lessonId);
+  const sequence = findLessonSequence(lessonId);
+  const lessonRecord = sequence?.lessonRecord ?? null;
+  const course = lessonRecord?.course ?? null;
+  const unit = lessonRecord?.unit ?? null;
+  const lessonPosition = sequence ? sequence.lessonIndex + 1 : null;
+  const totalLessons = sequence?.orderedLessons.length ?? null;
 
   return {
     id: lessonId,
     title: lessonRecord?.lesson.title ?? "Talking about daily routines",
+    courseId: course?.id ?? null,
+    courseTitle: course?.title ?? "A2 Confidence",
+    unitId: unit?.id ?? null,
+    unitTitle: unit?.title ?? "Talking about routines",
+    positionLabel: lessonPosition ? `Lesson ${String(lessonPosition).padStart(2, "0")}` : null,
+    totalLessons,
     summary:
       lessonRecord?.lesson.summary ??
       "Learn how to describe habits, routines, and time-based actions using clear everyday English.",
     quizId: `${lessonId}-quiz`,
+    previousLesson: sequence?.previousLesson
+      ? {
+          id: sequence.previousLesson.id,
+          title: sequence.previousLesson.title
+        }
+      : null,
+    nextLesson: sequence?.nextLesson
+      ? {
+          id: sequence.nextLesson.id,
+          title: sequence.nextLesson.title
+        }
+      : null,
     blocks: [
       {
         id: `${lessonId}-block-reading`,
@@ -591,12 +741,24 @@ export function buildLesson(lessonId) {
 
 export function buildQuiz(quizId) {
   const lessonRecord = quizId.endsWith("-quiz") ? findLessonRecordById(quizId.slice(0, -5)) : null;
+  const sequence = lessonRecord ? findLessonSequence(lessonRecord.lesson.id) : null;
 
   return {
     id: quizId,
     title: lessonRecord ? `${lessonRecord.lesson.title} checkpoint` : "Daily routines checkpoint",
+    lessonId: lessonRecord?.lesson.id ?? null,
+    courseId: lessonRecord?.course.id ?? null,
+    courseTitle: lessonRecord?.course.title ?? null,
+    unitId: lessonRecord?.unit.id ?? null,
+    unitTitle: lessonRecord?.unit.title ?? null,
     description:
       "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
+    nextLesson: sequence?.nextLesson
+      ? {
+          id: sequence.nextLesson.id,
+          title: sequence.nextLesson.title
+        }
+      : null,
     questions: [
       {
         id: `${quizId}-q1`,
