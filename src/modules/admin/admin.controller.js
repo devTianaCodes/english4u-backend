@@ -41,7 +41,15 @@ export function updateAdminCollectionItem(req, res, next) {
 
 export function deleteAdminCollectionItem(req, res, next) {
   try {
-    deleteAdminCollectionEntry(req.params.collection, req.params.id);
+    const item = deleteAdminCollectionEntry(req.params.collection, req.params.id);
+
+    if (item) {
+      return res.json({
+        collection: req.params.collection,
+        item
+      });
+    }
+
     return res.status(204).send();
   } catch (error) {
     return next(new HttpError(400, error.message));

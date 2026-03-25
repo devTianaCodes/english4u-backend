@@ -221,6 +221,168 @@ function mapLessonForAdmin(course, unit, lesson) {
   };
 }
 
+function createDefaultQuizTemplate(lesson) {
+  return {
+    title: `${lesson.title} checkpoint`,
+    description: "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
+    questions: [
+      {
+        prompt: "Choose the correct sentence.",
+        options: [
+          { text: "She go to work every day.", isCorrect: false },
+          { text: "She goes to work every day.", isCorrect: true },
+          { text: "She going to work every day.", isCorrect: false }
+        ]
+      },
+      {
+        prompt: "Which expression best completes this sentence: I study English ___ the evening.",
+        options: [
+          { text: "at", isCorrect: false },
+          { text: "in", isCorrect: true },
+          { text: "on", isCorrect: false }
+        ]
+      },
+      {
+        prompt: "Pick the phrase that describes a habit.",
+        options: [
+          { text: "I am cooking right now.", isCorrect: false },
+          { text: "I usually walk after dinner.", isCorrect: true },
+          { text: "I am walking to the station now.", isCorrect: false }
+        ]
+      }
+    ]
+  };
+}
+
+function buildQuizQuestions(quizId, questions) {
+  return questions.map((question, questionIndex) => ({
+    id: `${quizId}-q${questionIndex + 1}`,
+    prompt: question.prompt,
+    type: "single_choice",
+    options: question.options.map((option, optionIndex) => ({
+      id: `${quizId}-q${questionIndex + 1}-o${optionIndex + 1}`,
+      text: option.text,
+      isCorrect: Boolean(option.isCorrect)
+    }))
+  }));
+}
+
+function buildQuizFromLessonRecord(lessonRecord) {
+  const quizId = `${lessonRecord.lesson.id}-quiz`;
+  const quizTemplate = lessonRecord.lesson.quiz ?? createDefaultQuizTemplate(lessonRecord.lesson);
+  const sequence = findLessonSequence(lessonRecord.lesson.id);
+
+  return {
+    id: quizId,
+    title: quizTemplate.title,
+    lessonId: lessonRecord.lesson.id,
+    lessonTitle: lessonRecord.lesson.title,
+    courseId: lessonRecord.course.id,
+    courseTitle: lessonRecord.course.title,
+    unitId: lessonRecord.unit.id,
+    unitTitle: lessonRecord.unit.title,
+    description: quizTemplate.description,
+    hasCustomContent: Boolean(lessonRecord.lesson.quiz),
+    nextLesson: sequence?.nextLesson
+      ? {
+          id: sequence.nextLesson.id,
+          title: sequence.nextLesson.title
+        }
+      : null,
+    questions: buildQuizQuestions(quizId, quizTemplate.questions)
+  };
+}
+
+function mapQuizForAdmin(course, unit, lesson) {
+  const quiz = buildQuizFromLessonRecord({
+    course,
+    unit,
+    lesson
+  });
+
+  return {
+    id: quiz.id,
+    title: quiz.title,
+    lessonId: quiz.lessonId,
+    lessonTitle: quiz.lessonTitle,
+    courseId: quiz.courseId,
+    courseTitle: quiz.courseTitle,
+    unitId: quiz.unitId,
+    unitTitle: quiz.unitTitle,
+    description: quiz.description,
+    questionCount: quiz.questions.length,
+    hasCustomContent: quiz.hasCustomContent,
+    questions: quiz.questions.map((question) => ({
+      prompt: question.prompt,
+      options: question.options.map((option) => ({
+        text: option.text,
+        isCorrect: option.isCorrect
+      }))
+    }))
+  };
+}
+
+function findLessonRecordByQuizId(quizId) {
+  if (!quizId.endsWith("-quiz")) {
+    return null;
+  }
+
+  return findLessonRecordById(quizId.slice(0, -5));
+}
+
+function normalizeQuizPayload(lesson, payload) {
+  const title = payload.title?.trim() || `${lesson.title} checkpoint`;
+  const description =
+    payload.description?.trim() ||
+    "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.";
+  const rawQuestions = Array.isArray(payload.questions) ? payload.questions : [];
+
+  if (rawQuestions.length !== 3) {
+    throw new Error("Quiz content must include exactly three questions");
+  }
+
+  const questions = rawQuestions.map((question, questionIndex) => {
+    const prompt = question.prompt?.trim();
+    const rawOptions = Array.isArray(question.options) ? question.options : [];
+
+    if (!prompt) {
+      throw new Error(`Question ${questionIndex + 1} prompt is required`);
+    }
+
+    if (rawOptions.length !== 3) {
+      throw new Error(`Question ${questionIndex + 1} must have exactly three options`);
+    }
+
+    const options = rawOptions.map((option, optionIndex) => {
+      const text = option.text?.trim();
+
+      if (!text) {
+        throw new Error(`Question ${questionIndex + 1} option ${optionIndex + 1} is required`);
+      }
+
+      return {
+        text,
+        isCorrect: Boolean(option.isCorrect)
+      };
+    });
+
+    if (options.filter((option) => option.isCorrect).length !== 1) {
+      throw new Error(`Question ${questionIndex + 1} must have exactly one correct answer`);
+    }
+
+    return {
+      prompt,
+      options
+    };
+  });
+
+  return {
+    title,
+    description,
+    questions
+  };
+}
+
 function syncUnitLessonCount(unit) {
   unit.lessonCount = unit.lessons.length;
 }
@@ -330,12 +492,7 @@ export function getAdminCollectionItems(collection) {
   if (collection === "quizzes") {
     return courseLibrary.flatMap((course) =>
       course.units.flatMap((unit) =>
-        unit.lessons.map((lesson) => ({
-          id: `${lesson.id}-quiz`,
-          title: `${lesson.title} quiz`,
-          courseTitle: course.title,
-          unitTitle: unit.title
-        }))
+        unit.lessons.map((lesson) => mapQuizForAdmin(course, unit, lesson))
       )
     );
   }
@@ -455,7 +612,19 @@ export function createAdminCollectionEntry(collection, payload) {
     return mapLessonForAdmin(unitRecord.course, unitRecord.unit, newLesson);
   }
 
-  throw new Error("Creation is currently enabled for courses, units, and lessons only");
+  if (collection === "quizzes") {
+    const lessonRecord = findLessonRecordById(payload.lessonId);
+
+    if (!lessonRecord) {
+      throw new Error("A parent lesson is required");
+    }
+
+    lessonRecord.lesson.quiz = normalizeQuizPayload(lessonRecord.lesson, payload);
+
+    return mapQuizForAdmin(lessonRecord.course, lessonRecord.unit, lessonRecord.lesson);
+  }
+
+  throw new Error("Creation is currently enabled for courses, units, lessons, and quizzes only");
 }
 
 export function updateAdminCollectionEntry(collection, id, payload) {
@@ -592,7 +761,22 @@ export function updateAdminCollectionEntry(collection, id, payload) {
     return mapLessonForAdmin(lessonRecord.course, lessonRecord.unit, lessonRecord.lesson);
   }
 
-  throw new Error("Editing is currently enabled for courses, units, and lessons only");
+  if (collection === "quizzes") {
+    const lessonRecord = findLessonRecordByQuizId(id);
+
+    if (!lessonRecord) {
+      throw new Error("Quiz not found");
+    }
+
+    lessonRecord.lesson.quiz = normalizeQuizPayload(lessonRecord.lesson, {
+      ...payload,
+      lessonId: lessonRecord.lesson.id
+    });
+
+    return mapQuizForAdmin(lessonRecord.course, lessonRecord.unit, lessonRecord.lesson);
+  }
+
+  throw new Error("Editing is currently enabled for courses, units, lessons, and quizzes only");
 }
 
 export function deleteAdminCollectionEntry(collection, id) {
@@ -630,7 +814,19 @@ export function deleteAdminCollectionEntry(collection, id) {
     return;
   }
 
-  throw new Error("Deletion is currently enabled for courses, units, and lessons only");
+  if (collection === "quizzes") {
+    const lessonRecord = findLessonRecordByQuizId(id);
+
+    if (!lessonRecord) {
+      throw new Error("Quiz not found");
+    }
+
+    delete lessonRecord.lesson.quiz;
+
+    return mapQuizForAdmin(lessonRecord.course, lessonRecord.unit, lessonRecord.lesson);
+  }
+
+  throw new Error("Deletion is currently enabled for courses, units, lessons, and quizzes only");
 }
 
 export function buildCourseDetail(courseId) {
@@ -740,58 +936,24 @@ export function buildLesson(lessonId) {
 }
 
 export function buildQuiz(quizId) {
-  const lessonRecord = quizId.endsWith("-quiz") ? findLessonRecordById(quizId.slice(0, -5)) : null;
-  const sequence = lessonRecord ? findLessonSequence(lessonRecord.lesson.id) : null;
+  const lessonRecord = findLessonRecordByQuizId(quizId);
 
-  return {
-    id: quizId,
-    title: lessonRecord ? `${lessonRecord.lesson.title} checkpoint` : "Daily routines checkpoint",
-    lessonId: lessonRecord?.lesson.id ?? null,
-    courseId: lessonRecord?.course.id ?? null,
-    courseTitle: lessonRecord?.course.title ?? null,
-    unitId: lessonRecord?.unit.id ?? null,
-    unitTitle: lessonRecord?.unit.title ?? null,
-    description:
-      "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
-    nextLesson: sequence?.nextLesson
-      ? {
-          id: sequence.nextLesson.id,
-          title: sequence.nextLesson.title
-        }
-      : null,
-    questions: [
-      {
-        id: `${quizId}-q1`,
-        prompt: "Choose the correct sentence.",
-        type: "single_choice",
-        options: [
-          { id: `${quizId}-q1-o1`, text: "She go to work every day.", isCorrect: false },
-          { id: `${quizId}-q1-o2`, text: "She goes to work every day.", isCorrect: true },
-          { id: `${quizId}-q1-o3`, text: "She going to work every day.", isCorrect: false }
-        ]
-      },
-      {
-        id: `${quizId}-q2`,
-        prompt: "Which expression best completes this sentence: I study English ___ the evening.",
-        type: "single_choice",
-        options: [
-          { id: `${quizId}-q2-o1`, text: "at", isCorrect: false },
-          { id: `${quizId}-q2-o2`, text: "in", isCorrect: true },
-          { id: `${quizId}-q2-o3`, text: "on", isCorrect: false }
-        ]
-      },
-      {
-        id: `${quizId}-q3`,
-        prompt: "Pick the phrase that describes a habit.",
-        type: "single_choice",
-        options: [
-          { id: `${quizId}-q3-o1`, text: "I am cooking right now.", isCorrect: false },
-          { id: `${quizId}-q3-o2`, text: "I usually walk after dinner.", isCorrect: true },
-          { id: `${quizId}-q3-o3`, text: "I am walking to the station now.", isCorrect: false }
-        ]
-      }
-    ]
-  };
+  if (!lessonRecord) {
+    return {
+      id: quizId,
+      title: "Daily routines checkpoint",
+      lessonId: null,
+      courseId: null,
+      courseTitle: null,
+      unitId: null,
+      unitTitle: null,
+      description: "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
+      nextLesson: null,
+      questions: buildQuizQuestions(quizId, createDefaultQuizTemplate({ title: "Daily routines" }).questions)
+    };
+  }
+
+  return buildQuizFromLessonRecord(lessonRecord);
 }
 
 export function scoreQuizSubmission(quizId, answers) {
