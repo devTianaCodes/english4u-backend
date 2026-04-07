@@ -1,5 +1,5 @@
 import { getCourseCatalog } from "../../utils/demo-data.js";
-import { getLatestPlacementAttempt, savePlacementAttempt } from "./onboarding.repository.js";
+import { getLatestPlacementAttempt, getPlacementAttempts, savePlacementAttempt } from "./onboarding.repository.js";
 
 const scoreMap = {
   grammar: {
@@ -104,6 +104,25 @@ export async function getRecommendation(req, res, next) {
         recommendedLevel === "A1"
           ? "Start with foundation vocabulary, short grammar loops, and simple speaking prompts."
           : "The learner should begin with everyday communication topics and routine-based grammar."
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function getPlacementHistory(req, res, next) {
+  try {
+    const attempts = req.user?.id ? await getPlacementAttempts(req.user.id, 6) : [];
+    const latestAttempt = attempts[0] ?? null;
+    const previousAttempt = attempts[1] ?? null;
+
+    return res.json({
+      attempts,
+      latestAttempt,
+      trend:
+        latestAttempt && previousAttempt
+          ? latestAttempt.score - previousAttempt.score
+          : null
     });
   } catch (error) {
     return next(error);

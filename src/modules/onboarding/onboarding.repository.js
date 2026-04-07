@@ -1,5 +1,9 @@
 import { pool } from "../../db/pool.js";
 
+function normalizeLimit(limit, fallback = 5) {
+  return Math.min(Math.max(Number(limit) || fallback, 1), 20);
+}
+
 export async function savePlacementAttempt(userId, score, recommendedLevel) {
   await pool.execute(
     `
@@ -32,4 +36,25 @@ export async function getLatestPlacementAttempt(userId) {
     recommendedLevel: rows[0].recommended_level,
     createdAt: rows[0].created_at
   };
+}
+
+export async function getPlacementAttempts(userId, limit = 5) {
+  const safeLimit = normalizeLimit(limit);
+  const [rows] = await pool.execute(
+    `
+      SELECT id, score, recommended_level, created_at
+      FROM placement_attempts
+      WHERE user_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ${safeLimit}
+    `,
+    [userId]
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    score: row.score,
+    recommendedLevel: row.recommended_level,
+    createdAt: row.created_at
+  }));
 }

@@ -1,6 +1,10 @@
 import { pool } from "../../db/pool.js";
 import { resolveLessonSlugFromPersistedId } from "../../utils/demo-data.js";
 
+function normalizeLimit(limit, fallback = 5) {
+  return Math.min(Math.max(Number(limit) || fallback, 1), 20);
+}
+
 function toIsoDate(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
@@ -183,16 +187,71 @@ export async function saveQuizAttempt(userId, quizId, score, answers) {
 }
 
 export async function getRecentQuizAttempts(userId, limit = 5) {
+  const safeLimit = normalizeLimit(limit);
   const [rows] = await pool.execute(
     `
       SELECT id, quiz_id, score, answers_json, submitted_at
       FROM quiz_attempts
       WHERE user_id = ?
       ORDER BY submitted_at DESC, id DESC
-      LIMIT ?
+      LIMIT ${safeLimit}
     `,
-    [userId, limit]
+    [userId]
   );
 
   return rows;
+}
+
+export async function getWeeklyActivitySummary(userId) {
+  const [rows] = await pool.execute(
+    `
+      SELECT activity_date, COUNT(*) AS activity_count
+      FROM (
+        SELECT DATE(completed_at) AS activity_date
+        FROM lesson_progress
+        WHERE user_id = ? AND completed_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+
+        UNION ALL
+
+        SELECT DATE(submitted_at) AS activity_date
+        FROM quiz_attempts
+        WHERE user_id = ? AND submitted_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+      ) AS weekly_activity
+      GROUP BY activity_date
+      ORDER BY activity_date ASC
+    `,
+    [userId, userId]
+  );
+
+  const countsByDate = new Map(
+    rows.map((row) => [toIsoDate(row.activity_date), Number(row.activity_count) || 0])
+  );
+  const days = [];
+  const today = new Date();
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(today.getDate() - offset);
+
+    const dateKey = toIsoDate(date);
+    const activityCount = countsByDate.get(dateKey) ?? 0;
+
+    days.push({
+      dateKey,
+      label: date.toLocaleDateString("en-US", { weekday: "narrow" }),
+      activityCount,
+      intensity: Math.min(activityCount * 35, 100)
+    });
+  }
+
+  const totalActivities = days.reduce((sum, day) => sum + day.activityCount, 0);
+  const activeDays = days.filter((day) => day.activityCount > 0).length;
+
+  return {
+    days,
+    totalActivities,
+    activeDays,
+    completedSessions: activeDays
+  };
 }

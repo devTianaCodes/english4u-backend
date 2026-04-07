@@ -1,5 +1,5 @@
-import { buildLearnerPath, buildQuiz, resolveQuizSlugFromPersistedId } from "../../utils/demo-data.js";
-import { getGrammarTopicForLesson } from "../../utils/grammar-library.js";
+import { buildLearnerPath, buildLesson, buildQuiz, resolveQuizSlugFromPersistedId } from "../../utils/demo-data.js";
+import { getGrammarTopicById, getGrammarTopicForLesson } from "../../utils/grammar-library.js";
 import { getLatestPlacementAttempt } from "../onboarding/onboarding.repository.js";
 import { getCompletedLessonSlugs, getRecentQuizAttempts } from "../progress/progress.repository.js";
 
@@ -39,6 +39,36 @@ function createReviewItem(quiz, question, category, note, itemKey) {
       text: option.text
     }))
   };
+}
+
+function createStandaloneReviewItem({ id, category, note, prompt, options, lessonId, lessonTitle }) {
+  return {
+    id,
+    category,
+    note,
+    prompt,
+    quizId: null,
+    lessonId,
+    lessonTitle,
+    grammarTopic: lessonId ? getGrammarTopicForLesson(lessonId) : null,
+    answerId: options.find((option) => option.isCorrect)?.id ?? null,
+    options: options.map((option) => ({
+      id: option.id,
+      text: option.text
+    }))
+  };
+}
+
+function parseVocabularyTerms(lesson) {
+  const vocabularyBlocks = (lesson.blocks ?? []).filter((block) => block.type === "vocabulary");
+
+  return vocabularyBlocks.flatMap((block) =>
+    block.content
+      .split(",")
+      .map((term) => term.trim())
+      .filter(Boolean)
+      .slice(0, 5)
+  );
 }
 
 function summarizeGrammarTopics(items) {
@@ -99,6 +129,85 @@ function buildStarterItems(levelCode, completedLessonSlugs) {
   );
 }
 
+function buildGrammarItems(levelCode, completedLessonSlugs) {
+  const learnerPath = buildLearnerPath(levelCode, completedLessonSlugs);
+  const relatedLessonIds = new Set();
+
+  if (learnerPath.nextLesson?.id) {
+    const nextGrammarTopic = getGrammarTopicForLesson(learnerPath.nextLesson.id);
+    const topic = nextGrammarTopic ? getGrammarTopicById(nextGrammarTopic.id) : null;
+
+    for (const lessonId of topic?.relatedLessonIds ?? []) {
+      relatedLessonIds.add(lessonId);
+    }
+  }
+
+  if (relatedLessonIds.size === 0 && learnerPath.nextLesson?.id) {
+    relatedLessonIds.add(learnerPath.nextLesson.id);
+  }
+
+  return Array.from(relatedLessonIds)
+    .slice(0, 3)
+    .flatMap((lessonId) => {
+      const quiz = buildQuiz(`${lessonId}-quiz`);
+      const grammarTopic = getGrammarTopicForLesson(lessonId);
+
+      return quiz.questions.slice(0, 1).map((question) => {
+        const item = createReviewItem(
+          quiz,
+          question,
+          "Grammar",
+          `Grammar focus: ${grammarTopic?.title ?? quiz.lessonTitle ?? quiz.title}`,
+          `grammar-${lessonId}-${question.id}`
+        );
+
+        return {
+          ...item,
+          grammarTopic: grammarTopic ?? item.grammarTopic
+        };
+      });
+    });
+}
+
+function buildVocabularyItems(levelCode, completedLessonSlugs) {
+  const learnerPath = buildLearnerPath(levelCode, completedLessonSlugs);
+  const sourceLessonIds = [
+    learnerPath.nextLesson?.id,
+    ...completedLessonSlugs.slice(-2).reverse()
+  ].filter(Boolean);
+
+  if (sourceLessonIds.length === 0) {
+    return [];
+  }
+
+  const lessons = sourceLessonIds.map((lessonId) => buildLesson(lessonId));
+  const globalTermPool = lessons.flatMap((lesson) => parseVocabularyTerms(lesson));
+
+  return lessons.flatMap((lesson) => {
+    const terms = parseVocabularyTerms(lesson);
+
+    return terms.slice(0, 2).map((term, index) => {
+      const distractors = globalTermPool.filter((candidate) => candidate !== term).slice(index, index + 2);
+      const fallbackDistractors = ["usually", "schedule", "weekend"].filter((candidate) => candidate !== term);
+      const optionTerms = [term, ...distractors, ...fallbackDistractors].slice(0, 3);
+
+      return createStandaloneReviewItem({
+        id: `vocabulary-${lesson.id}-${index + 1}`,
+        category: "Words",
+        note: `Recall key vocabulary from ${lesson.title}`,
+        prompt: `Which word belongs to the vocabulary set for "${lesson.title}"?`,
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        options: optionTerms.map((optionTerm, optionIndex) => ({
+          id: `vocabulary-${lesson.id}-${index + 1}-option-${optionIndex + 1}`,
+          text: optionTerm,
+          isCorrect: optionTerm === term
+        }))
+      });
+    });
+  });
+}
+
 function summarizeCategories(items) {
   const counts = items.reduce((summary, item) => {
     summary[item.category] = (summary[item.category] ?? 0) + 1;
@@ -112,16 +221,106 @@ function summarizeCategories(items) {
   }));
 }
 
-export async function buildReviewPayload(userId) {
+function pickItemsForMode(mode, mistakeItems, starterItems, grammarItems, vocabularyItems) {
+  if (mode === "mistakes") {
+    return {
+      source: "recent-mistakes",
+      items: mistakeItems.slice(0, 6)
+    };
+  }
+
+  if (mode === "warm-up") {
+    return {
+      source: "starter-review",
+      items: starterItems.slice(0, 6)
+    };
+  }
+
+  if (mode === "grammar") {
+    return {
+      source: "grammar-review",
+      items: grammarItems.slice(0, 6)
+    };
+  }
+
+  if (mode === "vocabulary") {
+    return {
+      source: "vocabulary-review",
+      items: vocabularyItems.slice(0, 6)
+    };
+  }
+
+  if (mistakeItems.length > 0) {
+    return {
+      source: "recent-mistakes",
+      items: mistakeItems.slice(0, 6)
+    };
+  }
+
+  return {
+    source: vocabularyItems.length > 0 ? "vocabulary-review" : grammarItems.length > 0 ? "grammar-review" : "starter-review",
+    items: vocabularyItems.length > 0 ? vocabularyItems.slice(0, 6) : grammarItems.length > 0 ? grammarItems.slice(0, 6) : starterItems.slice(0, 6)
+  };
+}
+
+function buildModesSummary(mistakeItems, starterItems, grammarItems, vocabularyItems, activeMode) {
+  return [
+    {
+      id: "mistakes",
+      title: "Mistakes",
+      count: mistakeItems.length,
+      description: "Retry recent wrong quiz answers.",
+      isActive: activeMode === "mistakes"
+    },
+    {
+      id: "warm-up",
+      title: "Warm-up",
+      count: starterItems.length,
+      description: "Short practice before the next lesson.",
+      isActive: activeMode === "warm-up"
+    },
+    {
+      id: "grammar",
+      title: "Grammar",
+      count: grammarItems.length,
+      description: "Focused prompts tied to current grammar topics.",
+      isActive: activeMode === "grammar"
+    },
+    {
+      id: "vocabulary",
+      title: "Words",
+      count: vocabularyItems.length,
+      description: "Recall key words from current and recent lessons.",
+      isActive: activeMode === "vocabulary"
+    }
+  ];
+}
+
+export async function buildReviewPayload(userId, mode = "all") {
   const latestPlacement = await getLatestPlacementAttempt(userId);
   const completedLessonSlugs = await getCompletedLessonSlugs(userId);
   const recentAttempts = await getRecentQuizAttempts(userId, 5);
   const mistakeItems = buildItemsFromAttempts(recentAttempts);
-  const items = mistakeItems.length > 0 ? mistakeItems.slice(0, 6) : buildStarterItems(latestPlacement?.recommendedLevel ?? "A2", completedLessonSlugs);
+  const starterItems = buildStarterItems(latestPlacement?.recommendedLevel ?? "A2", completedLessonSlugs);
+  const grammarItems = buildGrammarItems(latestPlacement?.recommendedLevel ?? "A2", completedLessonSlugs);
+  const vocabularyItems = buildVocabularyItems(latestPlacement?.recommendedLevel ?? "A2", completedLessonSlugs);
+  const resolvedMode = ["mistakes", "warm-up", "grammar", "vocabulary"].includes(mode) ? mode : "all";
+  const { source, items } = pickItemsForMode(resolvedMode, mistakeItems, starterItems, grammarItems, vocabularyItems);
+  const activeMode = resolvedMode === "all"
+    ? source === "recent-mistakes"
+      ? "mistakes"
+      : source === "vocabulary-review"
+        ? "vocabulary"
+        : source === "grammar-review"
+          ? "grammar"
+          : "warm-up"
+    : resolvedMode;
 
   return {
     dueCount: items.length,
-    source: mistakeItems.length > 0 ? "recent-mistakes" : "starter-review",
+    source,
+    activeMode,
+    modes: buildModesSummary(mistakeItems, starterItems, grammarItems, vocabularyItems, activeMode),
     categories: summarizeCategories(items),
     grammarTopics: summarizeGrammarTopics(items),
     items: items.map(({ answerId, ...item }) => item),
@@ -129,8 +328,8 @@ export async function buildReviewPayload(userId) {
   };
 }
 
-export async function scoreReviewSession(userId, answers) {
-  const review = await buildReviewPayload(userId);
+export async function scoreReviewSession(userId, answers, mode = "all") {
+  const review = await buildReviewPayload(userId, mode);
   const selectedByItem = new Map((Array.isArray(answers) ? answers : []).map((answer) => [answer.itemId, answer.optionId]));
 
   let correctAnswers = 0;
@@ -147,6 +346,7 @@ export async function scoreReviewSession(userId, answers) {
     correctAnswers,
     totalQuestions,
     score: totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0,
+    activeMode: review.activeMode,
     reviewDueCount: review.dueCount,
     submittedAt: new Date().toISOString()
   };

@@ -163,6 +163,51 @@ const adminUsers = [
   }
 ];
 
+const courseMetaById = {
+  "a1-foundations": {
+    instructor: {
+      name: "Elena Rossi",
+      title: "Foundations English Coach",
+      bio: "Elena specializes in beginner adult learners and structured CEFR onboarding. She focuses on clear routines, pronunciation confidence, and short lesson momentum."
+    },
+    reviews: [
+      {
+        id: "a1-review-1",
+        author: "Maria G.",
+        rating: 5,
+        text: "The short lessons and clear progress path made beginner English feel manageable."
+      },
+      {
+        id: "a1-review-2",
+        author: "Luca T.",
+        rating: 5,
+        text: "I liked the balance between vocabulary, grammar, and practical speaking prompts."
+      }
+    ]
+  },
+  "a2-confidence": {
+    instructor: {
+      name: "James Walker",
+      title: "Practical Fluency Instructor",
+      bio: "James teaches routine fluency, workplace communication, and confidence-building practice for everyday English learners moving from A1 to A2."
+    },
+    reviews: [
+      {
+        id: "a2-review-1",
+        author: "Sara M.",
+        rating: 5,
+        text: "The weekly routine units felt practical and immediately useful for work and travel."
+      },
+      {
+        id: "a2-review-2",
+        author: "Daniel P.",
+        rating: 4,
+        text: "I liked the checkpoint reviews because they showed what I still needed to fix."
+      }
+    ]
+  }
+};
+
 const legacyPersistedLessonSlug = "a2-confidence-unit-2-lesson-1";
 
 function getAllLessonSlugs() {
@@ -252,6 +297,7 @@ function mapLessonForAdmin(course, unit, lesson) {
     summary: lesson.summary,
     duration: lesson.duration,
     focus: lesson.focus,
+    objectives: lesson.objectives ?? createDefaultLessonObjectives(lesson),
     blocks: (lesson.blocks ?? createDefaultLessonBlocks(lesson.id)).map((block) => ({
       type: block.type,
       title: block.title,
@@ -259,6 +305,14 @@ function mapLessonForAdmin(course, unit, lesson) {
       accent: block.accent
     }))
   };
+}
+
+function createDefaultLessonObjectives(lesson) {
+  return [
+    `Understand the main idea of ${lesson.title.toLowerCase()}.`,
+    `Use the key ${lesson.focus?.toLowerCase() ?? "lesson"} language in short practice.`,
+    "Complete the checkpoint with more confidence."
+  ];
 }
 
 function createDefaultLessonBlocks(lessonId) {
@@ -319,6 +373,19 @@ function normalizeLessonBlocks(lessonId, rawBlocks) {
   });
 }
 
+function normalizeLessonObjectives(lesson, rawObjectives) {
+  const candidateObjectives = Array.isArray(rawObjectives) && rawObjectives.length > 0 ? rawObjectives : createDefaultLessonObjectives(lesson);
+  const objectives = candidateObjectives
+    .map((objective) => String(objective ?? "").trim())
+    .filter(Boolean);
+
+  if (objectives.length === 0) {
+    return createDefaultLessonObjectives(lesson);
+  }
+
+  return objectives.slice(0, 4);
+}
+
 function createDefaultQuizTemplate(lesson) {
   return {
     title: `${lesson.title} checkpoint`,
@@ -326,6 +393,7 @@ function createDefaultQuizTemplate(lesson) {
     questions: [
       {
         prompt: "Choose the correct sentence.",
+        explanation: "Use the third-person singular with she, he, or it when you describe routines.",
         options: [
           { text: "She go to work every day.", isCorrect: false },
           { text: "She goes to work every day.", isCorrect: true },
@@ -334,6 +402,7 @@ function createDefaultQuizTemplate(lesson) {
       },
       {
         prompt: "Which expression best completes this sentence: I study English ___ the evening.",
+        explanation: "Use in the evening, in the morning, and in the afternoon for broad parts of the day.",
         options: [
           { text: "at", isCorrect: false },
           { text: "in", isCorrect: true },
@@ -342,6 +411,7 @@ function createDefaultQuizTemplate(lesson) {
       },
       {
         prompt: "Pick the phrase that describes a habit.",
+        explanation: "Habits usually use the simple present, not the present continuous.",
         options: [
           { text: "I am cooking right now.", isCorrect: false },
           { text: "I usually walk after dinner.", isCorrect: true },
@@ -357,6 +427,7 @@ function buildQuizQuestions(quizId, questions) {
     id: `${quizId}-q${questionIndex + 1}`,
     prompt: question.prompt,
     type: "single_choice",
+    explanation: question.explanation?.trim() || "Review the correct pattern, then retry a similar sentence.",
     options: question.options.map((option, optionIndex) => ({
       id: `${quizId}-q${questionIndex + 1}-o${optionIndex + 1}`,
       text: option.text,
@@ -412,6 +483,7 @@ function mapQuizForAdmin(course, unit, lesson) {
     hasCustomContent: quiz.hasCustomContent,
     questions: quiz.questions.map((question) => ({
       prompt: question.prompt,
+      explanation: question.explanation,
       options: question.options.map((option) => ({
         text: option.text,
         isCorrect: option.isCorrect
@@ -441,6 +513,7 @@ function normalizeQuizPayload(lesson, payload) {
 
   const questions = rawQuestions.map((question, questionIndex) => {
     const prompt = question.prompt?.trim();
+    const explanation = question.explanation?.trim();
     const rawOptions = Array.isArray(question.options) ? question.options : [];
 
     if (!prompt) {
@@ -470,6 +543,7 @@ function normalizeQuizPayload(lesson, payload) {
 
     return {
       prompt,
+      explanation: explanation || "Review the correct answer and compare it with the sentence pattern in the lesson.",
       options
     };
   });
@@ -702,6 +776,13 @@ export function createAdminCollectionEntry(collection, payload) {
       summary: payload.summary?.trim() || "New lesson summary pending.",
       duration: payload.duration?.trim() || "12 min",
       focus: payload.focus?.trim() || "Core practice",
+      objectives: normalizeLessonObjectives(
+        {
+          title,
+          focus: payload.focus?.trim() || "Core practice"
+        },
+        payload.objectives
+      ),
       blocks: normalizeLessonBlocks(id, payload.blocks)
     };
 
@@ -848,6 +929,10 @@ export function updateAdminCollectionEntry(collection, id, payload) {
       lessonRecord.lesson.focus = payload.focus.trim() || lessonRecord.lesson.focus;
     }
 
+    if (payload.objectives !== undefined) {
+      lessonRecord.lesson.objectives = normalizeLessonObjectives(lessonRecord.lesson, payload.objectives);
+    }
+
     if (payload.blocks !== undefined) {
       lessonRecord.lesson.blocks = normalizeLessonBlocks(id, payload.blocks);
     }
@@ -941,6 +1026,8 @@ export function buildCourseDetail(courseId) {
 
   return {
     ...course,
+    instructor: courseMetaById[course.id]?.instructor ?? null,
+    reviews: courseMetaById[course.id]?.reviews ?? [],
     unitCount: course.units.length,
     lessonCount: course.units.reduce((total, unit) => total + unit.lessons.length, 0),
     units: course.units.map((unit, index) => ({
@@ -990,6 +1077,7 @@ export function buildLesson(lessonId) {
     summary:
       lessonRecord?.lesson.summary ??
       "Learn how to describe habits, routines, and time-based actions using clear everyday English.",
+    objectives: lessonRecord?.lesson.objectives ?? createDefaultLessonObjectives(lessonRecord?.lesson ?? { title: lessonId, focus: "Core practice" }),
     grammarTopic: getGrammarTopicForLesson(lessonId),
     quizId: `${lessonId}-quiz`,
     previousLesson: sequence?.previousLesson
@@ -1035,13 +1123,28 @@ export function scoreQuizSubmission(quizId, answers) {
   const selectedByQuestion = new Map(submittedAnswers.map((answer) => [answer.questionId, answer.optionId]));
 
   let correctAnswers = 0;
+  const questionResults = [];
 
   for (const question of quiz.questions) {
     const correctOption = question.options.find((option) => option.isCorrect);
+    const selectedOptionId = selectedByQuestion.get(question.id) ?? null;
+    const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
+    const isCorrect = Boolean(correctOption && selectedOptionId === correctOption.id);
 
-    if (correctOption && selectedByQuestion.get(question.id) === correctOption.id) {
+    if (isCorrect) {
       correctAnswers += 1;
     }
+
+    questionResults.push({
+      id: question.id,
+      prompt: question.prompt,
+      explanation: question.explanation,
+      isCorrect,
+      selectedOptionId,
+      selectedOptionText: selectedOption?.text ?? null,
+      correctOptionId: correctOption?.id ?? null,
+      correctOptionText: correctOption?.text ?? null
+    });
   }
 
   const totalQuestions = quiz.questions.length;
@@ -1049,7 +1152,8 @@ export function scoreQuizSubmission(quizId, answers) {
   return {
     correctAnswers,
     totalQuestions,
-    score: Math.round((correctAnswers / totalQuestions) * 100)
+    score: Math.round((correctAnswers / totalQuestions) * 100),
+    questionResults
   };
 }
 

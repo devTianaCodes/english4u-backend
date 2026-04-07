@@ -2,9 +2,10 @@ function makeBlock(type, title, content, accent) {
   return { type, title, content, accent };
 }
 
-function makeQuestion(prompt, correct, distractorOne, distractorTwo) {
+function makeQuestion(prompt, correct, distractorOne, distractorTwo, explanation = `Correct answer: ${correct}.`) {
   return {
     prompt,
+    explanation,
     options: [
       { text: correct, isCorrect: true },
       { text: distractorOne, isCorrect: false },
@@ -16,6 +17,11 @@ function makeQuestion(prompt, correct, distractorOne, distractorTwo) {
 const lessonBlueprints = {
   "a1-foundations-unit-1-lesson-1": {
     summary: "Learn how to introduce yourself, say where you are from, and ask simple personal questions.",
+    objectives: [
+      "Introduce yourself with name, country, and city.",
+      "Ask where another person is from.",
+      "Build a three-sentence personal profile."
+    ],
     blocks: [
       makeBlock("reading", "Meet Sofia", "Hi, I am Sofia. I am from Spain and I live in Madrid. I am a student.", "Read it twice and notice the order: name, country, city, role."),
       makeBlock("grammar", "I am / You are", "Use I am for your own information and you are when you ask or answer about another person.", "Example: I am from Italy. You are from Brazil."),
@@ -34,6 +40,11 @@ const lessonBlueprints = {
   },
   "a1-foundations-unit-1-lesson-2": {
     summary: "Describe age and work with basic be-verbs and simple job vocabulary.",
+    objectives: [
+      "Say a person's age with years old.",
+      "Describe basic jobs with he is and she is.",
+      "Ask and answer simple work questions."
+    ],
     blocks: [
       makeBlock("reading", "Meet Omar", "Omar is 24 years old. He is a chef. He works in a small restaurant.", "Notice how age and job appear in separate short sentences."),
       makeBlock("grammar", "He is / She is", "Use he is and she is to talk about another person. Use years old after a number for age.", "Example: She is 30 years old. He is a doctor."),
@@ -52,6 +63,11 @@ const lessonBlueprints = {
   },
   "a1-foundations-unit-1-lesson-3": {
     summary: "Introduce another person using short listening-style recall and simple third-person sentences.",
+    objectives: [
+      "Introduce a classmate or friend clearly.",
+      "Use she is or he is correctly in short profiles.",
+      "Organize profile details in a natural order."
+    ],
     blocks: [
       makeBlock("reading", "Classmate profile", "This is Anna. She is from Poland. She is a designer and she lives in Krakow.", "Read once for meaning, then once for details."),
       makeBlock("grammar", "Talking about another person", "Use she is or he is when you introduce a classmate or friend.", "Keep each sentence clear and short."),
@@ -70,6 +86,11 @@ const lessonBlueprints = {
   },
   "a1-foundations-unit-2-lesson-1": {
     summary: "Build the vocabulary for a simple morning routine using high-frequency actions.",
+    objectives: [
+      "Recognize common morning routine actions.",
+      "Describe routine steps in time order.",
+      "Use simple verbs for daily habits."
+    ],
     blocks: [
       makeBlock("reading", "Tom's morning", "Tom wakes up at 7:00, takes a shower, eats breakfast, and goes to work at 8:15.", "Follow the actions in time order."),
       makeBlock("vocabulary", "Morning routine verbs", "wake up, get dressed, eat breakfast, go to work, drink coffee", "Say each verb with a time expression."),
@@ -88,6 +109,11 @@ const lessonBlueprints = {
   },
   "a1-foundations-unit-2-lesson-2": {
     summary: "Use every day and usually to describe repeated habits in simple present.",
+    objectives: [
+      "Place usually in the correct position.",
+      "Use every day to show repetition.",
+      "Write short habit sentences with frequency words."
+    ],
     blocks: [
       makeBlock("reading", "Nina's week", "Nina usually studies in the library. She goes there every day after lunch.", "Notice where usually and every day appear."),
       makeBlock("grammar", "Frequency words", "Use usually before the main verb and every day at the end of the sentence.", "Example: I usually walk home. I study English every day."),
@@ -106,6 +132,11 @@ const lessonBlueprints = {
   },
   "a1-foundations-unit-2-lesson-3": {
     summary: "Describe a weekday from morning to evening with clear simple present sentences.",
+    objectives: [
+      "Describe a weekday in sequence from morning to evening.",
+      "Use simple present verbs for repeated actions.",
+      "Add time phrases to make routines clearer."
+    ],
     blocks: [
       makeBlock("reading", "My weekday", "I leave home at 8:00, study until 1:00, have lunch with friends, and do homework in the evening.", "Use the text as a model for your own weekday."),
       makeBlock("grammar", "Simple present sequence", "Use simple present verbs to describe your routine from start to finish.", "Add time phrases to make the order easy to follow."),
@@ -124,6 +155,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-1-lesson-1": {
     summary: "Describe a full weekly routine with clearer sequencing and more natural time expressions.",
+    objectives: [
+      "Describe weekly patterns with day names.",
+      "Use part-of-day phrases more naturally.",
+      "Combine fixed habits and weekly variation."
+    ],
     blocks: [
       makeBlock("reading", "A busy week", "On weekdays, Laura starts work at 9:00, visits clients in the afternoon, and goes to the gym on Tuesday and Thursday.", "Notice the mix of weekday routine and weekly variation."),
       makeBlock("grammar", "Weekly routine patterns", "Use on + days and in the afternoon to describe repeated weekly actions.", "Example: On Monday, I work from home."),
@@ -142,6 +178,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-1-lesson-2": {
     summary: "Use common time expressions to talk about habits more naturally and precisely.",
+    objectives: [
+      "Link two actions with before and after.",
+      "Use during inside a time block.",
+      "Write more precise routine sentences."
+    ],
     blocks: [
       makeBlock("reading", "Habit timing", "I normally check email before breakfast, and I often review my tasks after lunch.", "Watch how the speaker places time expressions around the verb."),
       makeBlock("grammar", "Before / after / during", "Use before and after to connect two routine actions. Use during for an action inside a time period.", "Example: I study after dinner."),
@@ -160,6 +201,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-1-lesson-3": {
     summary: "Read and describe simple work and study schedules using practical timetable language.",
+    objectives: [
+      "Read simple work and study schedules.",
+      "Use from ... to ... for time ranges.",
+      "Compare two timetables in clear sentences."
+    ],
     blocks: [
       makeBlock("reading", "Two schedules", "Mina studies from 9:00 to 12:00 and works from 2:00 to 6:00. Daniel teaches in the morning and prepares lessons in the evening.", "Compare both schedules and notice the repeated patterns."),
       makeBlock("grammar", "From ... to ...", "Use from ... to ... to explain the start and end of a time block.", "Example: I work from 10:00 to 4:00."),
@@ -178,6 +224,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-2-lesson-1": {
     summary: "Use present simple confidently to describe regular daily routines in fuller sentences.",
+    objectives: [
+      "Use third-person present simple accurately.",
+      "Describe another person's routine with detail.",
+      "Spot common verb ending mistakes."
+    ],
     blocks: [
       makeBlock("reading", "Regular day", "Carlos gets up early, takes the bus to work, and usually cooks dinner when he gets home.", "Notice the verb endings with he."),
       makeBlock("grammar", "Third-person simple present", "Add -s or -es with he, she, and it in regular routines.", "Example: She watches videos after class."),
@@ -196,6 +247,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-2-lesson-2": {
     summary: "Talk about evening plans and after-work habits with more flexible conversation prompts.",
+    objectives: [
+      "Describe evening habits with natural phrases.",
+      "Use but to contrast two routine ideas.",
+      "Talk about after-work plans more flexibly."
+    ],
     blocks: [
       makeBlock("reading", "After work", "After work, Ben sometimes meets friends, but he often stays home and watches a series with his sister.", "Notice how the sentence contrasts two common evening choices."),
       makeBlock("grammar", "But and often", "Use but to contrast two routine ideas and often to show common frequency.", "Example: I want to go out, but I usually stay home."),
@@ -214,6 +270,11 @@ const lessonBlueprints = {
   },
   "a2-confidence-unit-2-lesson-3": {
     summary: "Compare weekend routines and speak with more confidence about different habits and preferences.",
+    objectives: [
+      "Compare Saturday and Sunday routines.",
+      "Use repeated weekend patterns clearly.",
+      "Show one contrast between different habits."
+    ],
     blocks: [
       makeBlock("reading", "Two weekends", "On Saturdays, Kim wakes up late and visits her parents. On Sundays, she stays home, cleans the apartment, and plans the new week.", "Compare what changes from one day to another."),
       makeBlock("grammar", "Weekend comparison", "Use on Saturdays / on Sundays to compare repeated weekend habits.", "You can combine actions with and to build fuller ideas."),
