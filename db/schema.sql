@@ -119,3 +119,12 @@ CREATE TABLE user_streaks (
   last_activity_at TIMESTAMP NULL,
   CONSTRAINT fk_user_streaks_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE study_plans (
+  user_id INT PRIMARY KEY,
+  sessions_per_week INT NOT NULL DEFAULT 4,
+  minutes_per_session INT NOT NULL DEFAULT 20,
+  focus VARCHAR(120) NOT NULL DEFAULT 'Speaking confidence',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_study_plans_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
