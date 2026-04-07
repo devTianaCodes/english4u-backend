@@ -217,8 +217,72 @@ function mapLessonForAdmin(course, unit, lesson) {
     unitTitle: unit.title,
     summary: lesson.summary,
     duration: lesson.duration,
-    focus: lesson.focus
+    focus: lesson.focus,
+    blocks: (lesson.blocks ?? createDefaultLessonBlocks(lesson.id)).map((block) => ({
+      type: block.type,
+      title: block.title,
+      content: block.content,
+      accent: block.accent
+    }))
   };
+}
+
+function createDefaultLessonBlocks(lessonId) {
+  return [
+    {
+      id: `${lessonId}-block-reading`,
+      type: "reading",
+      title: "Morning routine",
+      content:
+        "Emma wakes up at 6:30, makes coffee, and checks her calendar before she leaves for work. She usually starts work at 8:00.",
+      accent: "Read the example aloud and notice how the routine follows a predictable sequence."
+    },
+    {
+      id: `${lessonId}-block-grammar`,
+      type: "grammar",
+      title: "Simple present for habits",
+      content:
+        "Use the simple present to talk about repeated actions: I wake up early. She works from home. Add -s or -es for he, she, and it.",
+      accent: "Focus on the third-person singular form: goes, works, studies."
+    },
+    {
+      id: `${lessonId}-block-vocabulary`,
+      type: "vocabulary",
+      title: "Time expressions",
+      content: "Common expressions: every day, in the morning, after lunch, before class, at night.",
+      accent: "These phrases help learners place actions in time and build more natural sentences."
+    },
+    {
+      id: `${lessonId}-block-practice`,
+      type: "practice",
+      title: "Quick production prompt",
+      content: "Write three sentences about your weekday routine using the simple present.",
+      accent: "Example: I drink tea before I start work."
+    }
+  ];
+}
+
+function normalizeLessonBlocks(lessonId, rawBlocks) {
+  const sourceBlocks = Array.isArray(rawBlocks) && rawBlocks.length > 0 ? rawBlocks : createDefaultLessonBlocks(lessonId);
+
+  return sourceBlocks.map((block, index) => {
+    const type = block.type?.trim();
+    const title = block.title?.trim();
+    const content = block.content?.trim();
+    const accent = block.accent?.trim();
+
+    if (!type || !title || !content || !accent) {
+      throw new Error(`Lesson block ${index + 1} must include type, title, content, and accent`);
+    }
+
+    return {
+      id: `${lessonId}-block-${index + 1}`,
+      type,
+      title,
+      content,
+      accent
+    };
+  });
 }
 
 function createDefaultQuizTemplate(lesson) {
@@ -603,7 +667,8 @@ export function createAdminCollectionEntry(collection, payload) {
       title,
       summary: payload.summary?.trim() || "New lesson summary pending.",
       duration: payload.duration?.trim() || "12 min",
-      focus: payload.focus?.trim() || "Core practice"
+      focus: payload.focus?.trim() || "Core practice",
+      blocks: normalizeLessonBlocks(id, payload.blocks)
     };
 
     unitRecord.unit.lessons.push(newLesson);
@@ -747,6 +812,10 @@ export function updateAdminCollectionEntry(collection, id, payload) {
 
     if (payload.focus !== undefined) {
       lessonRecord.lesson.focus = payload.focus.trim() || lessonRecord.lesson.focus;
+    }
+
+    if (payload.blocks !== undefined) {
+      lessonRecord.lesson.blocks = normalizeLessonBlocks(id, payload.blocks);
     }
 
     if (lessonRecord.unit.id !== nextUnitRecord.unit.id) {
@@ -900,38 +969,7 @@ export function buildLesson(lessonId) {
           title: sequence.nextLesson.title
         }
       : null,
-    blocks: [
-      {
-        id: `${lessonId}-block-reading`,
-        type: "reading",
-        title: "Morning routine",
-        content:
-          "Emma wakes up at 6:30, makes coffee, and checks her calendar before she leaves for work. She usually starts work at 8:00.",
-        accent: "Read the example aloud and notice how the routine follows a predictable sequence."
-      },
-      {
-        id: `${lessonId}-block-grammar`,
-        type: "grammar",
-        title: "Simple present for habits",
-        content:
-          "Use the simple present to talk about repeated actions: I wake up early. She works from home. Add -s or -es for he, she, and it.",
-        accent: "Focus on the third-person singular form: goes, works, studies."
-      },
-      {
-        id: `${lessonId}-block-vocabulary`,
-        type: "vocabulary",
-        title: "Time expressions",
-        content: "Common expressions: every day, in the morning, after lunch, before class, at night.",
-        accent: "These phrases help learners place actions in time and build more natural sentences."
-      },
-      {
-        id: `${lessonId}-block-practice`,
-        type: "practice",
-        title: "Quick production prompt",
-        content: "Write three sentences about your weekday routine using the simple present.",
-        accent: "Example: I drink tea before I start work."
-      }
-    ]
+    blocks: lessonRecord?.lesson.blocks ?? createDefaultLessonBlocks(lessonId)
   };
 }
 
