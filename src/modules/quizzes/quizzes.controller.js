@@ -1,5 +1,5 @@
 import { buildQuiz, resolvePersistedQuizId, scoreQuizSubmission } from "../../utils/demo-data.js";
-import { getProgressSnapshot, saveQuizAttempt } from "../progress/progress.repository.js";
+import { getProgressSnapshot, isSeedPersistenceError, saveQuizAttempt } from "../progress/progress.repository.js";
 
 export function getQuiz(req, res) {
   const quiz = buildQuiz(req.params.quizId);
@@ -29,8 +29,14 @@ export async function submitQuiz(req, res, next) {
     let snapshot = null;
 
     if (persistedQuizId) {
-      streak = await saveQuizAttempt(req.user.id, persistedQuizId, result.score, answers);
-      snapshot = await getProgressSnapshot(req.user.id);
+      try {
+        streak = await saveQuizAttempt(req.user.id, persistedQuizId, result.score, answers);
+        snapshot = await getProgressSnapshot(req.user.id);
+      } catch (error) {
+        if (!isSeedPersistenceError(error)) {
+          throw error;
+        }
+      }
     }
 
     return res.json({

@@ -1,3 +1,6 @@
+import { getGrammarTopicForLesson } from "./grammar-library.js";
+import { getLessonBlueprint } from "./lesson-library.js";
+
 const courseLibrary = [
   {
     id: "a1-foundations",
@@ -19,19 +22,22 @@ const courseLibrary = [
             id: "a1-foundations-unit-1-lesson-1",
             title: "Saying your name and country",
             duration: "12 min",
-            focus: "Speaking basics"
+            focus: "Speaking basics",
+            ...getLessonBlueprint("a1-foundations-unit-1-lesson-1")
           },
           {
             id: "a1-foundations-unit-1-lesson-2",
             title: "Talking about age and work",
             duration: "14 min",
-            focus: "Present simple"
+            focus: "Present simple",
+            ...getLessonBlueprint("a1-foundations-unit-1-lesson-2")
           },
           {
             id: "a1-foundations-unit-1-lesson-3",
             title: "Introducing a classmate",
             duration: "10 min",
-            focus: "Listening and recall"
+            focus: "Listening and recall",
+            ...getLessonBlueprint("a1-foundations-unit-1-lesson-3")
           }
         ]
       },
@@ -46,19 +52,22 @@ const courseLibrary = [
             id: "a1-foundations-unit-2-lesson-1",
             title: "Morning routine essentials",
             duration: "11 min",
-            focus: "Vocabulary"
+            focus: "Vocabulary",
+            ...getLessonBlueprint("a1-foundations-unit-2-lesson-1")
           },
           {
             id: "a1-foundations-unit-2-lesson-2",
             title: "Using every day and usually",
             duration: "13 min",
-            focus: "Grammar patterns"
+            focus: "Grammar patterns",
+            ...getLessonBlueprint("a1-foundations-unit-2-lesson-2")
           },
           {
             id: "a1-foundations-unit-2-lesson-3",
             title: "Describe your weekday",
             duration: "15 min",
-            focus: "Sentence building"
+            focus: "Sentence building",
+            ...getLessonBlueprint("a1-foundations-unit-2-lesson-3")
           }
         ]
       }
@@ -84,19 +93,22 @@ const courseLibrary = [
             id: "a2-confidence-unit-1-lesson-1",
             title: "Describing your weekly routine",
             duration: "14 min",
-            focus: "Routine fluency"
+            focus: "Routine fluency",
+            ...getLessonBlueprint("a2-confidence-unit-1-lesson-1")
           },
           {
             id: "a2-confidence-unit-1-lesson-2",
             title: "Time expressions for habits",
             duration: "12 min",
-            focus: "Vocabulary"
+            focus: "Vocabulary",
+            ...getLessonBlueprint("a2-confidence-unit-1-lesson-2")
           },
           {
             id: "a2-confidence-unit-1-lesson-3",
             title: "Work and study schedules",
             duration: "16 min",
-            focus: "Reading and comprehension"
+            focus: "Reading and comprehension",
+            ...getLessonBlueprint("a2-confidence-unit-1-lesson-3")
           }
         ]
       },
@@ -111,19 +123,22 @@ const courseLibrary = [
             id: "a2-confidence-unit-2-lesson-1",
             title: "Talking about daily routines",
             duration: "15 min",
-            focus: "Grammar and reading"
+            focus: "Grammar and reading",
+            ...getLessonBlueprint("a2-confidence-unit-2-lesson-1")
           },
           {
             id: "a2-confidence-unit-2-lesson-2",
             title: "After work and evening plans",
             duration: "13 min",
-            focus: "Conversation prompts"
+            focus: "Conversation prompts",
+            ...getLessonBlueprint("a2-confidence-unit-2-lesson-2")
           },
           {
             id: "a2-confidence-unit-2-lesson-3",
             title: "Weekend routine comparison",
             duration: "16 min",
-            focus: "Speaking confidence"
+            focus: "Speaking confidence",
+            ...getLessonBlueprint("a2-confidence-unit-2-lesson-3")
           }
         ]
       }
@@ -147,6 +162,25 @@ const adminUsers = [
     streak: 12
   }
 ];
+
+const legacyPersistedLessonSlug = "a2-confidence-unit-2-lesson-1";
+
+function getAllLessonSlugs() {
+  return courseLibrary.flatMap((course) => course.units.flatMap((unit) => unit.lessons.map((lesson) => lesson.id)));
+}
+
+export function getPersistedLessonSlugs() {
+  const allLessonSlugs = getAllLessonSlugs();
+
+  return [
+    legacyPersistedLessonSlug,
+    ...allLessonSlugs.filter((lessonSlug) => lessonSlug !== legacyPersistedLessonSlug)
+  ];
+}
+
+export function getSeedCatalog() {
+  return structuredClone(courseLibrary);
+}
 
 function mapCourseForCatalog(course) {
   return {
@@ -956,6 +990,7 @@ export function buildLesson(lessonId) {
     summary:
       lessonRecord?.lesson.summary ??
       "Learn how to describe habits, routines, and time-based actions using clear everyday English.",
+    grammarTopic: getGrammarTopicForLesson(lessonId),
     quizId: `${lessonId}-quiz`,
     previousLesson: sequence?.previousLesson
       ? {
@@ -1019,35 +1054,25 @@ export function scoreQuizSubmission(quizId, answers) {
 }
 
 export function resolvePersistedLessonId(lessonSlug) {
-  if (lessonSlug === "a2-confidence-unit-2-lesson-1") {
-    return 1;
-  }
-
-  return null;
+  const index = getPersistedLessonSlugs().indexOf(lessonSlug);
+  return index === -1 ? null : index + 1;
 }
 
 export function resolvePersistedQuizId(quizSlug) {
-  if (quizSlug === "a2-confidence-unit-2-lesson-1-quiz") {
-    return 1;
+  if (!quizSlug.endsWith("-quiz")) {
+    return null;
   }
 
-  return null;
+  return resolvePersistedLessonId(quizSlug.slice(0, -5));
 }
 
 export function resolveQuizSlugFromPersistedId(quizId) {
-  if (quizId === 1) {
-    return "a2-confidence-unit-2-lesson-1-quiz";
-  }
-
-  return null;
+  const lessonSlug = resolveLessonSlugFromPersistedId(quizId);
+  return lessonSlug ? `${lessonSlug}-quiz` : null;
 }
 
 export function resolveLessonSlugFromPersistedId(lessonId) {
-  if (lessonId === 1) {
-    return "a2-confidence-unit-2-lesson-1";
-  }
-
-  return null;
+  return getPersistedLessonSlugs()[lessonId - 1] ?? null;
 }
 
 export function buildLearnerPath(levelCode, completedLessonSlugs = []) {

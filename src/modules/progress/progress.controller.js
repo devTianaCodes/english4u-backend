@@ -1,6 +1,6 @@
 import { HttpError } from "../../utils/http-error.js";
 import { dashboardSnapshot, resolvePersistedLessonId } from "../../utils/demo-data.js";
-import { getProgressSnapshot, markLessonCompleted } from "./progress.repository.js";
+import { getProgressSnapshot, isSeedPersistenceError, markLessonCompleted } from "./progress.repository.js";
 
 export async function getMyProgress(req, res, next) {
   try {
@@ -28,8 +28,24 @@ export async function completeLesson(req, res, next) {
       });
     }
 
-    const streak = await markLessonCompleted(req.user.id, persistedLessonId);
-    const snapshot = await getProgressSnapshot(req.user.id);
+    let streak;
+    let snapshot;
+
+    try {
+      streak = await markLessonCompleted(req.user.id, persistedLessonId);
+      snapshot = await getProgressSnapshot(req.user.id);
+    } catch (error) {
+      if (isSeedPersistenceError(error)) {
+        return res.status(201).json({
+          userId: req.user.id,
+          lessonId: req.params.lessonId,
+          status: "completed_demo",
+          message: "This lesson is not present in the imported SQL yet. Re-import the latest export to persist it in MySQL."
+        });
+      }
+
+      throw error;
+    }
 
     return res.status(201).json({
       userId: req.user.id,

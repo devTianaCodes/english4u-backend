@@ -1,19 +1,82 @@
+import { getCourseCatalog } from "../../utils/demo-data.js";
 import { getLatestPlacementAttempt, savePlacementAttempt } from "./onboarding.repository.js";
+
+const scoreMap = {
+  grammar: {
+    high: 3,
+    medium: 2,
+    low: 1
+  },
+  vocabulary: {
+    high: 3,
+    medium: 2,
+    low: 1
+  },
+  reading: {
+    high: 3,
+    medium: 2,
+    low: 1
+  },
+  goal: {
+    "4_plus": 2,
+    "2_3": 1,
+    "1": 0
+  }
+};
+
+function buildPlacementAnalysis(answers) {
+  const [grammar, vocabulary, reading, goal] = Array.isArray(answers) ? answers : [];
+  const weightedScore =
+    (scoreMap.grammar[grammar] ?? 1) * 3 +
+    (scoreMap.vocabulary[vocabulary] ?? 1) * 3 +
+    (scoreMap.reading[reading] ?? 1) * 3 +
+    (scoreMap.goal[goal] ?? 0);
+  const score = Math.round((weightedScore / 29) * 100);
+  const recommendedLevel = weightedScore >= 20 ? "A2" : "A1";
+  const recommendedCourse = getCourseCatalog().find((course) => course.level === recommendedLevel) ?? getCourseCatalog()[0];
+  const focusAreas = [];
+
+  if (grammar === "low") {
+    focusAreas.push("Rebuild simple present patterns and sentence order.");
+  }
+
+  if (vocabulary === "low") {
+    focusAreas.push("Expand high-frequency everyday vocabulary before moving faster.");
+  }
+
+  if (reading === "low") {
+    focusAreas.push("Use short guided reading blocks with comprehension support.");
+  }
+
+  if (focusAreas.length === 0) {
+    focusAreas.push("Keep building routine fluency with short quizzes and lesson replay.");
+  }
+
+  return {
+    score,
+    recommendedLevel,
+    recommendedCourse: recommendedCourse
+      ? {
+          id: recommendedCourse.id,
+          title: recommendedCourse.title,
+          summary: recommendedCourse.summary
+        }
+      : null,
+    confidenceLabel: weightedScore >= 24 ? "Strong match" : weightedScore >= 18 ? "Good starting point" : "Foundation-first path",
+    focusAreas
+  };
+}
 
 export async function submitPlacementTest(req, res, next) {
   const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
-  const score = answers.length * 10;
-  const recommendedLevel = score >= 30 ? "A2" : "A1";
+  const analysis = buildPlacementAnalysis(answers);
 
   try {
     if (req.user?.id) {
-      await savePlacementAttempt(req.user.id, score, recommendedLevel);
+      await savePlacementAttempt(req.user.id, analysis.score, analysis.recommendedLevel);
     }
 
-    return res.json({
-      score,
-      recommendedLevel
-    });
+    return res.json(analysis);
   } catch (error) {
     return next(error);
   }
@@ -24,10 +87,18 @@ export async function getRecommendation(req, res, next) {
     const latestAttempt = req.user?.id ? await getLatestPlacementAttempt(req.user.id) : null;
     const recommendedLevel = latestAttempt?.recommendedLevel ?? "A2";
     const score = latestAttempt?.score ?? null;
+    const recommendedCourse = getCourseCatalog().find((course) => course.level === recommendedLevel) ?? getCourseCatalog()[0];
 
     return res.json({
       recommendedLevel,
       score,
+      recommendedCourse: recommendedCourse
+        ? {
+            id: recommendedCourse.id,
+            title: recommendedCourse.title,
+            summary: recommendedCourse.summary
+          }
+        : null,
       hasCompletedPlacement: Boolean(latestAttempt),
       summary:
         recommendedLevel === "A1"

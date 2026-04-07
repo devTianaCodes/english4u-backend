@@ -1,4 +1,5 @@
 import { buildLearnerPath, buildQuiz, resolveQuizSlugFromPersistedId } from "../../utils/demo-data.js";
+import { getGrammarTopicForLesson } from "../../utils/grammar-library.js";
 import { getLatestPlacementAttempt } from "../onboarding/onboarding.repository.js";
 import { getCompletedLessonSlugs, getRecentQuizAttempts } from "../progress/progress.repository.js";
 
@@ -21,6 +22,7 @@ function parseAnswers(payload) {
 
 function createReviewItem(quiz, question, category, note, itemKey) {
   const correctOption = question.options.find((option) => option.isCorrect);
+  const grammarTopic = quiz.lessonId ? getGrammarTopicForLesson(quiz.lessonId) : null;
 
   return {
     id: itemKey,
@@ -30,12 +32,25 @@ function createReviewItem(quiz, question, category, note, itemKey) {
     quizId: quiz.id,
     lessonId: quiz.lessonId,
     lessonTitle: quiz.lessonTitle,
+    grammarTopic,
     answerId: correctOption?.id ?? null,
     options: question.options.map((option) => ({
       id: option.id,
       text: option.text
     }))
   };
+}
+
+function summarizeGrammarTopics(items) {
+  const topicMap = new Map();
+
+  for (const item of items) {
+    if (item.grammarTopic && !topicMap.has(item.grammarTopic.id)) {
+      topicMap.set(item.grammarTopic.id, item.grammarTopic);
+    }
+  }
+
+  return Array.from(topicMap.values());
 }
 
 function buildItemsFromAttempts(attempts) {
@@ -108,6 +123,7 @@ export async function buildReviewPayload(userId) {
     dueCount: items.length,
     source: mistakeItems.length > 0 ? "recent-mistakes" : "starter-review",
     categories: summarizeCategories(items),
+    grammarTopics: summarizeGrammarTopics(items),
     items: items.map(({ answerId, ...item }) => item),
     answerKey: new Map(items.map((item) => [item.id, item.answerId]))
   };

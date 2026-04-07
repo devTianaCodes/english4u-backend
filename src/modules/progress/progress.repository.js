@@ -13,6 +13,10 @@ function isPreviousDay(previous, current) {
   return diff > 0 && diff <= 24 * 60 * 60 * 1000 && toIsoDate(previousDate) !== toIsoDate(currentDate);
 }
 
+export function isSeedPersistenceError(error) {
+  return error?.code === "ER_NO_REFERENCED_ROW_2" || error?.code === "ER_NO_SUCH_TABLE";
+}
+
 async function upsertUserStreakWithConnection(connection, userId) {
   const now = new Date();
   const [rows] = await connection.execute(
