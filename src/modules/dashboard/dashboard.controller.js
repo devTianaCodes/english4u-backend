@@ -1,6 +1,7 @@
 import { buildLearnerPath, dashboardSnapshot } from "../../utils/demo-data.js";
 import { getLatestPlacementAttempt } from "../onboarding/onboarding.repository.js";
 import { getCompletedLessonSlugs, getProgressSnapshot } from "../progress/progress.repository.js";
+import { buildReviewPayload } from "../review/review.service.js";
 
 export async function getDashboard(req, res, next) {
   try {
@@ -9,6 +10,7 @@ export async function getDashboard(req, res, next) {
     const currentLevel = latestPlacement?.recommendedLevel ?? dashboardSnapshot.currentLevel;
     const completedLessonSlugs = await getCompletedLessonSlugs(req.user.id);
     const learnerPath = buildLearnerPath(currentLevel, completedLessonSlugs);
+    const review = await buildReviewPayload(req.user.id);
 
     return res.json({
       ...dashboardSnapshot,
@@ -23,7 +25,8 @@ export async function getDashboard(req, res, next) {
       nextLesson: learnerPath.nextLesson,
       completedLessonSlugs: learnerPath.completedLessonSlugs,
       completedLessons: snapshot.completedLessons,
-      quizAverage: snapshot.quizAverage
+      quizAverage: snapshot.quizAverage,
+      reviewDueCount: review.dueCount
     });
   } catch (error) {
     return next(error);

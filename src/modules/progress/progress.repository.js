@@ -177,3 +177,18 @@ export async function saveQuizAttempt(userId, quizId, score, answers) {
     connection.release();
   }
 }
+
+export async function getRecentQuizAttempts(userId, limit = 5) {
+  const [rows] = await pool.execute(
+    `
+      SELECT id, quiz_id, score, answers_json, submitted_at
+      FROM quiz_attempts
+      WHERE user_id = ?
+      ORDER BY submitted_at DESC, id DESC
+      LIMIT ?
+    `,
+    [userId, limit]
+  );
+
+  return rows;
+}

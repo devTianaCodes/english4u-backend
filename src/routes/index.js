@@ -8,6 +8,7 @@ import lessonsRoutes from "../modules/lessons/lessons.routes.js";
 import onboardingRoutes from "../modules/onboarding/onboarding.routes.js";
 import progressRoutes from "../modules/progress/progress.routes.js";
 import quizzesRoutes from "../modules/quizzes/quizzes.routes.js";
+import reviewRoutes from "../modules/review/review.routes.js";
 import usersRoutes from "../modules/users/users.routes.js";
 import healthRoutes from "./health.routes.js";
 
@@ -20,6 +21,7 @@ router.use("/courses", coursesRoutes);
 router.use("/lessons", lessonsRoutes);
 router.use("/quizzes", requireAuth, quizzesRoutes);
 router.use("/progress", requireAuth, progressRoutes);
+router.use("/review", requireAuth, reviewRoutes);
 router.use("/dashboard", requireAuth, dashboardRoutes);
 router.use("/users", usersRoutes);
 router.use("/admin", adminRoutes);

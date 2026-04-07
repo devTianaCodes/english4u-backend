@@ -996,6 +996,14 @@ export function resolvePersistedQuizId(quizSlug) {
   return null;
 }
 
+export function resolveQuizSlugFromPersistedId(quizId) {
+  if (quizId === 1) {
+    return "a2-confidence-unit-2-lesson-1-quiz";
+  }
+
+  return null;
+}
+
 export function resolveLessonSlugFromPersistedId(lessonId) {
   if (lessonId === 1) {
     return "a2-confidence-unit-2-lesson-1";
