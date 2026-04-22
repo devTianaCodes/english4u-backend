@@ -42,7 +42,9 @@ export async function submitQuiz(req, res, next) {
     return res.json({
       quizId: req.params.quizId,
       lessonId: quiz.lessonId,
+      lessonSlug: quiz.lessonSlug,
       courseId: quiz.courseId,
+      courseSlug: quiz.courseSlug,
       courseTitle: quiz.courseTitle,
       nextLesson: quiz.nextLesson,
       ...result,

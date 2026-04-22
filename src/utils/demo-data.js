@@ -230,6 +230,7 @@ export function getSeedCatalog() {
 function mapCourseForCatalog(course) {
   return {
     id: course.id,
+    slug: course.id,
     title: course.title,
     level: course.level,
     published: course.published,
@@ -442,19 +443,24 @@ function buildQuizFromLessonRecord(lessonRecord) {
   const sequence = findLessonSequence(lessonRecord.lesson.id);
 
   return {
+    slug: quizId,
     id: quizId,
     title: quizTemplate.title,
     lessonId: lessonRecord.lesson.id,
+    lessonSlug: lessonRecord.lesson.id,
     lessonTitle: lessonRecord.lesson.title,
     courseId: lessonRecord.course.id,
+    courseSlug: lessonRecord.course.id,
     courseTitle: lessonRecord.course.title,
     unitId: lessonRecord.unit.id,
+    unitSlug: lessonRecord.unit.id,
     unitTitle: lessonRecord.unit.title,
     description: quizTemplate.description,
     hasCustomContent: Boolean(lessonRecord.lesson.quiz),
     nextLesson: sequence?.nextLesson
       ? {
           id: sequence.nextLesson.id,
+          slug: sequence.nextLesson.id,
           title: sequence.nextLesson.title
         }
       : null,
@@ -1025,6 +1031,7 @@ export function buildCourseDetail(courseId) {
   }
 
   return {
+    slug: course.id,
     ...course,
     instructor: courseMetaById[course.id]?.instructor ?? null,
     reviews: courseMetaById[course.id]?.reviews ?? [],
@@ -1048,7 +1055,9 @@ export function buildUnitDetail(unitId) {
     if (unit) {
       return {
         ...unit,
+        slug: unit.id,
         courseId: course.id,
+        courseSlug: course.id,
         courseTitle: course.title
       };
     }
@@ -1067,10 +1076,13 @@ export function buildLesson(lessonId) {
 
   return {
     id: lessonId,
+    slug: lessonId,
     title: lessonRecord?.lesson.title ?? "Talking about daily routines",
     courseId: course?.id ?? null,
+    courseSlug: course?.id ?? null,
     courseTitle: course?.title ?? "A2 Confidence",
     unitId: unit?.id ?? null,
+    unitSlug: unit?.id ?? null,
     unitTitle: unit?.title ?? "Talking about routines",
     positionLabel: lessonPosition ? `Lesson ${String(lessonPosition).padStart(2, "0")}` : null,
     totalLessons,
@@ -1080,15 +1092,18 @@ export function buildLesson(lessonId) {
     objectives: lessonRecord?.lesson.objectives ?? createDefaultLessonObjectives(lessonRecord?.lesson ?? { title: lessonId, focus: "Core practice" }),
     grammarTopic: getGrammarTopicForLesson(lessonId),
     quizId: `${lessonId}-quiz`,
+    quizSlug: `${lessonId}-quiz`,
     previousLesson: sequence?.previousLesson
       ? {
           id: sequence.previousLesson.id,
+          slug: sequence.previousLesson.id,
           title: sequence.previousLesson.title
         }
       : null,
     nextLesson: sequence?.nextLesson
       ? {
           id: sequence.nextLesson.id,
+          slug: sequence.nextLesson.id,
           title: sequence.nextLesson.title
         }
       : null,
@@ -1101,12 +1116,16 @@ export function buildQuiz(quizId) {
 
   if (!lessonRecord) {
     return {
+      slug: quizId,
       id: quizId,
       title: "Daily routines checkpoint",
       lessonId: null,
+      lessonSlug: null,
       courseId: null,
+      courseSlug: null,
       courseTitle: null,
       unitId: null,
+      unitSlug: null,
       unitTitle: null,
       description: "Answer a short set of questions to confirm you understood the routine vocabulary and grammar.",
       nextLesson: null,
@@ -1187,15 +1206,18 @@ export function buildLearnerPath(levelCode, completedLessonSlugs = []) {
 
   return {
     courseId: course.id,
+    courseSlug: course.id,
     courseTitle: course.title,
     level: course.level,
     nextLesson: nextLesson
       ? {
           id: nextLesson.id,
+          slug: nextLesson.id,
           title: nextLesson.title,
           unitTitle: nextLesson.unitTitle,
           duration: nextLesson.duration,
-          quizId: `${nextLesson.id}-quiz`
+          quizId: `${nextLesson.id}-quiz`,
+          quizSlug: `${nextLesson.id}-quiz`
         }
       : null,
     completedLessonSlugs
