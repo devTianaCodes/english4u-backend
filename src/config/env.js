@@ -5,7 +5,10 @@ dotenv.config();
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number.parseInt(process.env.PORT ?? "4000", 10),
-  clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
+  clientUrls: (process.env.CLIENT_URL ?? "http://localhost:5173")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
   adminEmails: (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())

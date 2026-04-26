@@ -100,19 +100,22 @@ export function verifyAuthToken(token) {
 
 export function setAuthCookie(res, user) {
   const token = signAuthToken(user);
+  const sameSite = env.nodeEnv === "production" ? "none" : "lax";
 
   res.cookie(env.authCookieName, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite,
     secure: env.nodeEnv === "production",
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 }
 
 export function clearAuthCookie(res) {
+  const sameSite = env.nodeEnv === "production" ? "none" : "lax";
+
   res.clearCookie(env.authCookieName, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite,
     secure: env.nodeEnv === "production"
   });
 }

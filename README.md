@@ -28,7 +28,3 @@ To enable real authentication:
 - `src/modules`: feature route/controller modules
 - `src/routes`: top-level route composition
 - `db/schema.sql`: initial relational schema draft
-
-## Important Rules
-- AI planning files live in `/Users/parents/Developer/Project English4U/.english4u-planning`, not in this repository.
-- Do not commit any changes without explicit user permission.
